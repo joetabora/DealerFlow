@@ -17,13 +17,13 @@ export function InventoryBikeCard({ bike }: Props) {
   return (
     <Link
       href={`/bikes/${bike.id}`}
-      className="group block overflow-hidden transition-all duration-200 hover:scale-[1.01] hover:-translate-y-px"
+      className="group block overflow-hidden transition-all duration-200 active:scale-[0.97] sm:hover:scale-[1.01] sm:hover:-translate-y-px"
     >
       <CardShell
         className="h-full overflow-hidden bg-white"
         hover
       >
-        <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
+        <div className="relative aspect-[16/10] w-full min-h-52 max-md:min-h-56 sm:aspect-[4/3] sm:min-h-0">
           {bike.heroUrl && bike.heroIsVideo ? (
             <video
               src={bike.heroUrl}
@@ -50,19 +50,20 @@ export function InventoryBikeCard({ bike }: Props) {
             </span>
           ) : null}
         </div>
-        <div className="p-4">
-          <h3 className="text-sm font-semibold leading-snug text-gray-900 line-clamp-2">
+        <div className="p-4 max-md:p-5 max-md:pt-4">
+          <h3 className="text-sm font-semibold leading-snug text-gray-900 line-clamp-2 max-md:text-base">
             {bike.title ?? "Untitled"}
           </h3>
-          <p className="mt-1.5 text-base font-semibold tabular-nums text-gray-900">
+          <p className="mt-1.5 text-base font-semibold tabular-nums text-gray-900 max-md:text-lg">
             {bike.price ?? "—"}
           </p>
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="max-w-[55%] truncate rounded-full bg-gray-100 px-2 py-0.5 text-xs leading-tight text-gray-700">
+          <div className="mt-3 flex items-center justify-between gap-2 max-md:mt-3.5">
+            <span className="min-h-8 max-w-[55%] truncate rounded-full bg-gray-100 px-3 py-1 text-xs leading-tight text-gray-700 max-md:py-1.5 max-md:text-sm">
               {bike.location?.trim() || "—"}
             </span>
             <Badge
               variant={bike.status === "available" ? "available" : "sold"}
+              className="min-h-8 shrink-0 px-2.5 py-1 text-xs max-md:px-3 max-md:py-1.5"
             >
               {statusLabel}
             </Badge>

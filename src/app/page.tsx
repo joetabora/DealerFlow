@@ -86,22 +86,31 @@ export default async function Home() {
             <p className="mt-0.5 text-sm text-gray-600">
               Run imports and get ready to post.
             </p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
               <Link
                 href="/import/csv"
-                className={buttonPrimary + " w-full text-center sm:w-auto"}
+                className={
+                  buttonPrimary +
+                  " w-full min-h-14 text-center text-base font-medium active:scale-[0.97] sm:min-h-9 sm:text-sm"
+                }
               >
                 Import CSV
               </Link>
               <Link
                 href="/media"
-                className={buttonSecondary + " w-full text-center sm:w-auto"}
+                className={
+                  buttonSecondary +
+                  " w-full min-h-14 text-center text-base font-medium active:scale-[0.97] sm:min-h-9 sm:text-sm"
+                }
               >
                 Upload media
               </Link>
               <Link
                 href="/scheduler"
-                className={buttonSecondary + " w-full text-center sm:w-auto"}
+                className={
+                  buttonSecondary +
+                  " w-full min-h-14 text-center text-base font-medium active:scale-[0.97] sm:min-h-9 sm:text-sm"
+                }
               >
                 Generate week
               </Link>

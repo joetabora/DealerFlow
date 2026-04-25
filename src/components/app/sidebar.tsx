@@ -7,15 +7,15 @@ import { cn } from "@/lib/cn";
 const nav = [
   { href: "/", label: "Dashboard" },
   { href: "/inventory", label: "Inventory" },
-  { href: "/media", label: "Media" },
   { href: "/scheduler", label: "Scheduler" },
+  { href: "/media", label: "Media" },
 ] as const;
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-[240px] flex-col border-r border-gray-200 bg-white">
+    <aside className="hidden md:flex fixed left-0 top-0 z-40 h-screen w-[240px] flex-col border-r border-gray-200 bg-white">
       <div className="border-b border-gray-100 px-4 py-4">
         <Link href="/" className="block leading-tight">
           <span className="text-base font-semibold tracking-tight text-gray-900">

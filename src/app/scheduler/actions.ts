@@ -2,6 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import {
+  aggregateByCanonicalHour,
+  buildSmartHoursByDay,
+  defaultHoursByDay,
+  getDealerTimeZone,
+} from "@/lib/post-timing";
 import type { LocationFilter, PostStatus } from "@/types/scheduler";
 
 export type PostRowOut = {
@@ -195,6 +201,55 @@ export async function clearWeek(
 type BikeRow = { id: string; title: string | null; price: string | null; location: string | null };
 
 export type ListBikesResult = { ok: true; bikes: BikeRow[] } | { ok: false; error: string };
+
+export type SlotPlanResult =
+  | { ok: true; hoursByDay: number[][] }
+  | { ok: false; error: string };
+
+/**
+ * Builds 7×4 local clock hours (phase 1: 9/12/3/7 daily; phase 3 with posted history).
+ */
+export async function getSlotPlan(): Promise<SlotPlanResult> {
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch {
+    return { ok: true, hoursByDay: defaultHoursByDay() };
+  }
+
+  const tz = getDealerTimeZone();
+  const { data, error } = await supabase
+    .from("posts")
+    .select("scheduled_date, posted_at, likes, comments, status")
+    .eq("status", "posted");
+
+  if (error) {
+    return { ok: true, hoursByDay: defaultHoursByDay() };
+  }
+
+  const rows = (data ?? []) as {
+    scheduled_date: string;
+    posted_at: string | null;
+    likes: number | null;
+    comments: number | null;
+  }[];
+
+  const samples = rows
+    .map((r) => {
+      const effectiveAt = r.posted_at ?? r.scheduled_date;
+      if (!effectiveAt) return null;
+      return {
+        effectiveAt,
+        likes: r.likes ?? 0,
+        comments: r.comments ?? 0,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null);
+
+  const byHour = aggregateByCanonicalHour(samples, tz);
+  const hoursByDay = buildSmartHoursByDay(byHour, samples.length);
+  return { ok: true, hoursByDay };
+}
 
 export async function listBikesForSchedule(
   location: LocationFilter,

@@ -1,4 +1,5 @@
 import { getSlotDate, getWeekEndExclusive } from "@/lib/week";
+import { defaultHoursByDay } from "@/lib/post-timing";
 import type { PostStatus, SchedulerCell } from "@/types/scheduler";
 
 export type ApplyCell = {
@@ -17,9 +18,11 @@ export function weekRange(monday: Date): { from: string; to: string } {
 export function buildApplyFlat(
   weekStart: Date,
   g: (SchedulerCell | null)[][],
+  hoursByDay: number[][] = defaultHoursByDay(),
 ): ApplyCell[] {
   const out: ApplyCell[] = [];
   for (let d = 0; d < 7; d++) {
+    const dayHours = hoursByDay[d] ?? hoursByDay[0] ?? defaultHoursByDay()[0]!;
     for (let s = 0; s < 4; s++) {
       const c = g[d]![s];
       if (!c) {
@@ -29,7 +32,7 @@ export function buildApplyFlat(
       out.push({
         bikeId: c.bikeId,
         status: c.status,
-        scheduledAt: getSlotDate(weekStart, d, s).toISOString(),
+        scheduledAt: getSlotDate(weekStart, d, s, dayHours).toISOString(),
       });
     }
   }
@@ -60,7 +63,11 @@ type BikeForGen = { id: string; title: string | null; price: string | null; loca
 /**
  * Fills up to 28 slots: unique bike per day, round-robin through the list.
  */
-export function buildGenerateApplyFlat(weekStart: Date, bikes: BikeForGen[]): ApplyCell[] {
+export function buildGenerateApplyFlat(
+  weekStart: Date,
+  bikes: BikeForGen[],
+  hoursByDay: number[][] = defaultHoursByDay(),
+): ApplyCell[] {
   const usedBikePerDay: Set<string>[] = Array.from(
     { length: 7 },
     () => new Set(),
@@ -69,6 +76,7 @@ export function buildGenerateApplyFlat(weekStart: Date, bikes: BikeForGen[]): Ap
   if (bikes.length === 0) return flat;
   let cursor = 0;
   for (let d = 0; d < 7; d++) {
+    const dayHours = hoursByDay[d] ?? hoursByDay[0] ?? defaultHoursByDay()[0]!;
     for (let s = 0; s < 4; s++) {
       for (let tries = 0; tries < bikes.length; tries++) {
         const b = bikes[cursor % bikes.length]!;
@@ -78,7 +86,7 @@ export function buildGenerateApplyFlat(weekStart: Date, bikes: BikeForGen[]): Ap
         flat[d * 4 + s] = {
           bikeId: b.id,
           status: "scheduled",
-          scheduledAt: getSlotDate(weekStart, d, s).toISOString(),
+          scheduledAt: getSlotDate(weekStart, d, s, dayHours).toISOString(),
         };
         break;
       }

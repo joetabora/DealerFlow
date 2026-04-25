@@ -13,6 +13,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { mapPostsToGrid } from "@/lib/schedule-mapper";
 import {
@@ -32,9 +33,12 @@ import {
   applyWeek,
   clearWeek,
   getSchedulerPosts,
+  getSlotPlan,
   listBikesForSchedule,
 } from "@/app/scheduler/actions";
-import { getMonday, dayLabels } from "@/lib/week";
+import { SHELL_MAX, SHELL_PX } from "@/components/app/shell-classnames";
+import { defaultHoursByDay } from "@/lib/post-timing";
+import { getMonday, getSlotDate, dayLabels } from "@/lib/week";
 import type { LocationFilter, StatusFilter, SchedulerCell } from "@/types/scheduler";
 
 function toDropSlot(over: { id: string | number } | null) {
@@ -47,7 +51,7 @@ function toDropSlot(over: { id: string | number } | null) {
   return null;
 }
 
-function fromActive(active: { id: string | number } | null) {
+function fromActiveDrag(active: { id: string | number } | null) {
   if (!active) return null;
   const s = String(active.id);
   const b = /^drag-(\d+)-(\d+)$/.exec(s);
@@ -78,20 +82,45 @@ function dayLabel(monday: Date, dayIndex: number) {
   });
 }
 
-function EmptySlot({ d, s, overRing }: { d: number; s: number; overRing: boolean }) {
+function formatSlotTime(
+  monday: Date,
+  d: number,
+  s: number,
+  hoursByDay: number[][],
+) {
+  const dayH = hoursByDay[d] ?? hoursByDay[0] ?? defaultHoursByDay()[0]!;
+  const inst = getSlotDate(monday, d, s, dayH);
+  return inst.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function EmptySlot({
+  d,
+  s,
+  overRing,
+  timeHint,
+}: {
+  d: number;
+  s: number;
+  overRing: boolean;
+  timeHint: string;
+}) {
   const id = `drop-${d}-${s}`;
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex min-h-[5rem] items-center justify-center rounded-xl border border-dashed p-0.5 text-xs text-gray-400 transition",
+        "flex min-h-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed p-1.5 text-center transition",
+        "max-md:min-h-[5.5rem] max-md:py-2",
         isOver && overRing
-          ? "border-gray-900/20 bg-gray-50 ring-1 ring-inset ring-gray-900/15"
-          : "border-gray-200/80 bg-gray-50/40",
+          ? "border-gray-900/20 bg-gray-50 ring-1 ring-inset ring-gray-900/10"
+          : isOver
+            ? "border-gray-900/15 bg-gray-50/60"
+            : "border-gray-200/80 bg-gray-50/50",
       )}
     >
-      Drop here
+      <span className="text-[10px] font-medium text-gray-400">{timeHint}</span>
+      <span className="text-xs text-gray-400">Open slot · drop a card</span>
     </div>
   );
 }
@@ -103,9 +132,10 @@ type FilledProps = {
   overRing: boolean;
   locFilter: LocationFilter;
   stFilter: StatusFilter;
+  timeLabel: string;
 };
 
-function FilledSlot({ d, s, cell, overRing, locFilter, stFilter }: FilledProps) {
+function FilledSlot({ d, s, cell, overRing, locFilter, stFilter, timeLabel }: FilledProps) {
   const dropId = `drop-${d}-${s}`;
   const dragId = `drag-${d}-${s}`;
   const { setNodeRef: setDrop, isOver: overDrop } = useDroppable({ id: dropId });
@@ -125,7 +155,7 @@ function FilledSlot({ d, s, cell, overRing, locFilter, stFilter }: FilledProps) 
     <div
       ref={setDrop}
       className={cn(
-        "rounded-xl p-0.5 transition",
+        "rounded-xl p-0.5 transition duration-200",
         overDrop && overRing
           ? "bg-gray-50 ring-1 ring-inset ring-gray-900/15"
           : "border border-transparent",
@@ -141,34 +171,42 @@ function FilledSlot({ d, s, cell, overRing, locFilter, stFilter }: FilledProps) 
         <SchedulerCard
           cell={cell}
           dimmed={dimmed}
-          className="cursor-grab active:cursor-grabbing"
+          timeLabel={timeLabel}
+          className="cursor-grab active:scale-[0.99] active:cursor-grabbing"
         />
       </div>
     </div>
   );
 }
 
-function SlotCell(props: {
+type SlotCellProps = {
   d: number;
   s: number;
   cell: SchedulerCell | null;
   overRing: boolean;
   locFilter: LocationFilter;
   stFilter: StatusFilter;
-}) {
+  monday: Date;
+  hoursByDay: number[][];
+};
+
+function SlotCell(props: SlotCellProps) {
+  const { d, s, overRing, locFilter, stFilter, monday, hoursByDay } = props;
+  const timeHint = formatSlotTime(monday, d, s, hoursByDay);
   if (props.cell) {
     return (
       <FilledSlot
-        d={props.d}
-        s={props.s}
+        d={d}
+        s={s}
         cell={props.cell}
-        overRing={props.overRing}
-        locFilter={props.locFilter}
-        stFilter={props.stFilter}
+        overRing={overRing}
+        locFilter={locFilter}
+        stFilter={stFilter}
+        timeLabel={timeHint}
       />
     );
   }
-  return <EmptySlot d={props.d} s={props.s} overRing={props.overRing} />;
+  return <EmptySlot d={d} s={s} overRing={overRing} timeHint={timeHint} />;
 }
 
 const empty7x4 = () =>
@@ -178,6 +216,7 @@ export default function SchedulerClient() {
   const { show } = useToast();
   const [monday] = useState(() => getMonday(new Date()));
   const [grid, setGrid] = useState<(SchedulerCell | null)[][]>(empty7x4);
+  const [hoursByDay, setHoursByDay] = useState<number[][]>(() => defaultHoursByDay());
   const [locFilter, setLocFilter] = useState<LocationFilter>("all");
   const [stFilter, setStFilter] = useState<StatusFilter>("all");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -194,7 +233,8 @@ export default function SchedulerClient() {
 
   const reload = useCallback(async () => {
     setLoadError(null);
-    const r = await getSchedulerPosts(from, to);
+    const [r, plan] = await Promise.all([getSchedulerPosts(from, to), getSlotPlan()]);
+    if (plan.ok) setHoursByDay(plan.hoursByDay);
     if (!r.ok) {
       setLoadError(r.error);
       return;
@@ -216,7 +256,8 @@ export default function SchedulerClient() {
     setIsBoot(true);
     const run = async () => {
       setLoadError(null);
-      const r = await getSchedulerPosts(from, to);
+      const [r, plan] = await Promise.all([getSchedulerPosts(from, to), getSlotPlan()]);
+      if (plan.ok) setHoursByDay(plan.hoursByDay);
       if (!r.ok) {
         setLoadError(r.error);
         setIsBoot(false);
@@ -239,7 +280,7 @@ export default function SchedulerClient() {
   }, [from, to, monday]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
   );
 
   const persist = useCallback(
@@ -249,7 +290,7 @@ export default function SchedulerClient() {
         return;
       }
       startTransition(async () => {
-        const r = await applyWeek(from, to, buildApplyFlat(monday, next));
+        const r = await applyWeek(from, to, buildApplyFlat(monday, next, hoursByDay));
         if (r.ok) {
           show("Schedule updated.", "success");
           await reload();
@@ -259,7 +300,7 @@ export default function SchedulerClient() {
         }
       });
     },
-    [from, to, monday, show, reload],
+    [from, to, monday, hoursByDay, show, reload],
   );
 
   const onDragStart = (e: DragStartEvent) => {
@@ -271,18 +312,20 @@ export default function SchedulerClient() {
   const onDragEnd = (e: DragEndEvent) => {
     setOverRing(false);
     setActiveCell(null);
-    const from = fromActive(e.active);
+    const fromSlot = fromActiveDrag(e.active);
     const t = toDropSlot(e.over);
-    if (from == null || t == null) return;
-    if (from.d === t.d && from.s === t.s) return;
+    if (fromSlot == null || t == null) return;
+    if (fromSlot.d === t.d && fromSlot.s === t.s) return;
 
     setGrid((g) => {
       const n = g.map((row) => row.map((c) => c));
-      if (!n[from.d]?.[from.s] || n[from.d]![from.s] == null) return g;
-      const a = n[from.d]![from.s]!;
+      if (!n[fromSlot.d]?.[fromSlot.s] || n[fromSlot.d]![fromSlot.s] == null) {
+        return g;
+      }
+      const a = n[fromSlot.d]![fromSlot.s]!;
       const b = n[t.d]![t.s];
       n[t.d]![t.s] = a;
-      n[from.d]![from.s] = b;
+      n[fromSlot.d]![fromSlot.s] = b;
       if (hasDuplicateBikesOnSameDay(n)) {
         show("That move would duplicate a bike on the same day.", "error");
         return g;
@@ -294,7 +337,12 @@ export default function SchedulerClient() {
 
   const onGenerate = useCallback(() => {
     startTransition(async () => {
-      const b = await listBikesForSchedule(locFilter);
+      const [b, plan] = await Promise.all([
+        listBikesForSchedule(locFilter),
+        getSlotPlan(),
+      ]);
+      const h = plan.ok ? plan.hoursByDay : defaultHoursByDay();
+      if (plan.ok) setHoursByDay(plan.hoursByDay);
       if (!b.ok) {
         show(b.error, "error");
         return;
@@ -303,10 +351,10 @@ export default function SchedulerClient() {
         show("No available bikes for this location filter.", "error");
         return;
       }
-      const flat = buildGenerateApplyFlat(monday, b.bikes);
+      const flat = buildGenerateApplyFlat(monday, b.bikes, h);
       const r = await applyWeek(from, to, flat);
       if (r.ok) {
-        show("Week generated. Drag to adjust or reorder.", "success");
+        show("Week generated with optimized posting times. Drag to adjust.", "success");
         await reload();
       } else {
         show(r.error, "error");
@@ -334,7 +382,7 @@ export default function SchedulerClient() {
         <PageHeader
           title="Scheduler"
           action={
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="hidden flex-wrap items-center justify-end gap-2 md:flex">
               <span className="h-9 w-24 animate-pulse rounded-xl bg-gray-200" />
               <span className="h-9 w-20 animate-pulse rounded-xl bg-gray-200" />
             </div>
@@ -352,7 +400,7 @@ export default function SchedulerClient() {
       <PageHeader
         title="Scheduler"
         action={
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="hidden flex-wrap items-center justify-end gap-2 md:flex">
             <button
               type="button"
               onClick={onGenerate}
@@ -372,12 +420,12 @@ export default function SchedulerClient() {
           </div>
         }
       />
-      <AppLayout>
-        <div className="space-y-4">
+      <AppLayout className="max-md:pb-24">
+        <div className="space-y-4 transition-opacity duration-200">
           {loadError && !hasAny ? (
-            <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-900">
-              {loadError} Connect <code className="rounded bg-amber-100/80 px-1">.env.local</code> to load
-              and save.
+            <p className="animate-enter rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-900">
+              {loadError} Connect <code className="rounded bg-amber-100/80 px-1">.env.local</code> to
+              load and save.
             </p>
           ) : null}
 
@@ -394,7 +442,7 @@ export default function SchedulerClient() {
                     Location
                   </span>
                   <select
-                    className="mt-0.5 block rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900"
+                    className="mt-0.5 min-h-11 w-full min-w-[8rem] rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
                     value={locFilter}
                     onChange={(e) => setLocFilter(e.target.value as LocationFilter)}
                     disabled={isPending}
@@ -409,7 +457,7 @@ export default function SchedulerClient() {
                     Status
                   </span>
                   <select
-                    className="mt-0.5 block rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900"
+                    className="mt-0.5 min-h-11 w-full min-w-[8.5rem] rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
                     value={stFilter}
                     onChange={(e) => setStFilter(e.target.value as StatusFilter)}
                     disabled={isPending}
@@ -420,28 +468,45 @@ export default function SchedulerClient() {
                     <option value="posted">Posted</option>
                   </select>
                 </div>
+                <button
+                  type="button"
+                  onClick={onClear}
+                  className={buttonSecondary + " min-h-11 w-full min-w-0 sm:w-auto md:hidden"}
+                  disabled={isPending}
+                >
+                  Clear week
+                </button>
               </div>
             </div>
 
             {!hasAny ? (
-              <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 rounded-2xl border border-gray-200 bg-white/80 p-8 text-center shadow-sm">
+              <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 rounded-2xl border border-gray-200 bg-white/80 p-6 text-center shadow-sm transition duration-200 md:min-h-[320px]">
                 <p className="text-sm text-gray-600">No posts scheduled for this week.</p>
-                <button type="button" onClick={onGenerate} className={buttonPrimary} disabled={isPending}>
+                <button
+                  type="button"
+                  onClick={onGenerate}
+                  className={buttonPrimary + " min-h-11 w-full max-w-sm"}
+                  disabled={isPending}
+                >
                   {isPending ? "Working…" : "Generate week"}
                 </button>
               </div>
             ) : (
-              <div className="animate-fade-in-up overflow-x-auto pb-1">
-                <div className="min-w-[720px] grid grid-cols-7 gap-2 sm:min-w-0 sm:gap-3">
+              <div className="animate-fade-in-up max-md:pb-2 md:overflow-x-auto">
+                <div className="grid grid-cols-1 gap-6 md:min-w-0 md:grid-cols-7 md:gap-3">
                   {dayLabels.map((day, d) => (
-                    <div key={day} className="space-y-2">
+                    <div
+                      key={day}
+                      id={`scheduler-day-${d}`}
+                      className="space-y-2.5 max-md:scroll-mt-4"
+                    >
                       <div className="px-0.5">
                         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                           {day}
                         </p>
                         <p className="text-xs text-gray-500">{dayLabel(monday, d)}</p>
                       </div>
-                      <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-col gap-2 max-md:gap-2.5">
                         {[0, 1, 2, 3].map((s) => (
                           <div
                             key={s}
@@ -455,6 +520,8 @@ export default function SchedulerClient() {
                               overRing={overRing}
                               locFilter={locFilter}
                               stFilter={stFilter}
+                              monday={monday}
+                              hoursByDay={hoursByDay}
                             />
                           </div>
                         ))}
@@ -465,16 +532,55 @@ export default function SchedulerClient() {
               </div>
             )}
 
-            <DragOverlay dropAnimation={null} className="z-50 w-[min(100vw-2rem,20rem)]">
+            <DragOverlay
+              dropAnimation={null}
+              className="z-50 w-[min(100vw-2rem,20rem)]"
+            >
               {activeCell ? (
-                <div className="scale-[1.03] shadow-lg">
-                  <SchedulerCard cell={activeCell} className="cursor-grabbing" />
+                <div className="scale-[1.02] shadow-2xl transition-transform duration-200">
+                  <SchedulerCard
+                    cell={activeCell}
+                    className="cursor-grabbing"
+                  />
                 </div>
               ) : null}
             </DragOverlay>
           </DndContext>
         </div>
       </AppLayout>
+
+      {/* Sticky mobile actions: above bottom tab bar */}
+      <div
+        className="pointer-events-none fixed inset-x-0 z-30 md:hidden"
+        style={{
+          bottom: "calc(3.5rem + env(safe-area-inset-bottom, 0px))",
+        }}
+      >
+        <div
+          className={cn(
+            SHELL_MAX,
+            SHELL_PX,
+            "pointer-events-auto border-t border-gray-200/80 bg-white/90 shadow-[0_-2px_12px_rgba(0,0,0,0.04)] backdrop-blur-md",
+          )}
+        >
+          <div className="flex min-h-14 items-stretch gap-2 py-1.5">
+            <button
+              type="button"
+              onClick={onGenerate}
+              className={buttonPrimary + " min-h-12 flex-1 text-base font-medium active:scale-[0.97]"}
+              disabled={isPending}
+            >
+              {isPending ? "…" : "Generate week"}
+            </button>
+            <Link
+              href="/inventory"
+              className={buttonSecondary + " min-h-12 flex-1 text-center text-base font-medium active:scale-[0.97]"}
+            >
+              + Add post
+            </Link>
+          </div>
+        </div>
+      </div>
     </>
   );
 }

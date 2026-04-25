@@ -16,7 +16,7 @@ export function AppLayout({
       className={cn(
         SHELL_MAX,
         SHELL_PX,
-        "flex-1 space-y-5 py-4",
+        "flex-1 space-y-5 py-4 max-md:pb-2",
         className,
       )}
     >
