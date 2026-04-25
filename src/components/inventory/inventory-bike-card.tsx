@@ -17,7 +17,7 @@ export function InventoryBikeCard({ bike }: Props) {
   return (
     <Link
       href={`/bikes/${bike.id}`}
-      className="group block overflow-hidden transition-transform duration-200 hover:scale-[1.01]"
+      className="group block overflow-hidden transition-all duration-200 hover:scale-[1.01] hover:-translate-y-px"
     >
       <CardShell
         className="h-full overflow-hidden bg-white"
@@ -27,7 +27,7 @@ export function InventoryBikeCard({ bike }: Props) {
           {bike.heroUrl && bike.heroIsVideo ? (
             <video
               src={bike.heroUrl}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
               muted
               playsInline
               preload="metadata"
@@ -37,7 +37,7 @@ export function InventoryBikeCard({ bike }: Props) {
             <img
               src={bike.heroUrl}
               alt=""
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">

@@ -7,7 +7,8 @@ export function Card({ className, hover = true, children, ...props }: CardProps)
     <div
       className={cn(
         "overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm",
-        hover && "transition hover:shadow-md",
+        hover &&
+          "transition-all duration-200 hover:-translate-y-px hover:shadow-md",
         className,
       )}
       {...props}
@@ -24,7 +25,8 @@ export function CardShell({ className, hover = true, children, ...props }: CardN
     <div
       className={cn(
         "overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm",
-        hover && "transition hover:shadow-md",
+        hover &&
+          "transition-all duration-200 hover:-translate-y-px hover:shadow-md",
         className,
       )}
       {...props}

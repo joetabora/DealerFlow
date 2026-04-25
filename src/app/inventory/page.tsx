@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AppLayout } from "@/components/app/app-layout";
 import { PageHeader } from "@/components/app/page-header";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/button";
-import { InventoryBikeCard } from "@/components/inventory/inventory-bike-card";
+import { StaggeredInventoryGrid } from "@/components/inventory/staggered-inventory-grid";
 import { getInventoryBikes } from "@/lib/inventory-list";
 
 export const dynamic = "force-dynamic";
@@ -58,11 +58,7 @@ export default async function InventoryPage() {
             to get started.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
-            {result.bikes.map((b) => (
-              <InventoryBikeCard key={b.id} bike={b} />
-            ))}
-          </div>
+          <StaggeredInventoryGrid bikes={result.bikes} />
         )}
       </AppLayout>
     </>

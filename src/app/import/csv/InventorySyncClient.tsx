@@ -4,8 +4,10 @@ import { useState, useTransition } from "react";
 import { importInventoryCsv, type CsvImportResult } from "./actions";
 import { BulkMediaUploader } from "./BulkMediaUploader";
 import { buttonPrimary } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 
 export function InventorySyncClient() {
+  const { show } = useToast();
   const [csvState, setCsvState] = useState<CsvImportResult | null>(null);
   const [mediaKey, setMediaKey] = useState(0);
   const [pending, startTransition] = useTransition();
@@ -20,6 +22,12 @@ export function InventorySyncClient() {
       setCsvState(r);
       if (r.ok) {
         setMediaKey((k) => k + 1);
+        show(
+          `Inventory updated: ${r.imported} in stock, ${r.removed} removed from catalog.`,
+          "success",
+        );
+      } else {
+        show(r.error, "error");
       }
     });
   }
@@ -71,20 +79,11 @@ export function InventorySyncClient() {
             {pending ? "Importing…" : "Import / update bikes"}
           </button>
         </form>
-        {csvState && (
-          <p
-            className={
-              csvState.ok
-                ? "mt-2.5 text-sm text-green-700"
-                : "mt-2.5 text-sm text-red-700"
-            }
-            role="status"
-          >
-            {csvState.ok
-              ? `Saved ${csvState.imported} bike(s) from the file, removed ${csvState.removed} not in the file anymore.`
-              : csvState.error}
+        {csvState && !csvState.ok ? (
+          <p className="mt-2.5 text-sm text-red-700" role="status">
+            {csvState.error}
           </p>
-        )}
+        ) : null}
       </section>
 
       <section>
