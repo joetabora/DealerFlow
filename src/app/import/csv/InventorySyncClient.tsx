@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { importInventoryCsv, type CsvImportResult } from "./actions";
 import { BulkMediaUploader } from "./BulkMediaUploader";
+import { buttonPrimary } from "@/components/ui/button";
 
 export function InventorySyncClient() {
   const [csvState, setCsvState] = useState<CsvImportResult | null>(null);
@@ -24,12 +25,12 @@ export function InventorySyncClient() {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-7">
       <section>
-        <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-lg font-medium leading-tight text-gray-800">
           1. Import inventory (CSV)
         </h2>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1.5 text-sm leading-relaxed text-gray-600">
           Exports with columns like{" "}
           <strong>Stock Number</strong>, <strong>Model</strong>, <strong>Year</strong>,{" "}
           <strong>Price</strong>, <strong>Mileage</strong>, and optional{" "}
@@ -39,7 +40,7 @@ export function InventorySyncClient() {
           removed (e.g. sold). URL scrapes or manual rows with skus that never appear
           in a later CSV are removed too.{" "}
         </p>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1.5 text-sm leading-relaxed text-gray-600">
           <strong>Media:</strong> use a folder per stock, named exactly like the
           stock number, and drop it (or a parent of several) into the dashed area, or
           use the file picker. File names in flat folders can still use the
@@ -47,10 +48,10 @@ export function InventorySyncClient() {
         </p>
         <form
           onSubmit={onCsvSubmit}
-          className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
+          className="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-end"
         >
-          <div>
-            <label className="block text-xs font-medium text-zinc-500">
+          <div className="min-w-0 flex-1">
+            <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">
               CSV file
             </label>
             <input
@@ -59,13 +60,13 @@ export function InventorySyncClient() {
               accept=".csv,text/csv"
               required
               disabled={pending}
-              className="mt-1 block w-full text-sm"
+              className="mt-0.5 block w-full text-sm"
             />
           </div>
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+            className={buttonPrimary + " w-full disabled:opacity-50 sm:w-auto"}
           >
             {pending ? "Importing…" : "Import / update bikes"}
           </button>
@@ -74,8 +75,8 @@ export function InventorySyncClient() {
           <p
             className={
               csvState.ok
-                ? "mt-3 text-sm text-emerald-700 dark:text-emerald-400"
-                : "mt-3 text-sm text-red-700 dark:text-red-400"
+                ? "mt-2.5 text-sm text-green-700"
+                : "mt-2.5 text-sm text-red-700"
             }
             role="status"
           >
@@ -87,22 +88,18 @@ export function InventorySyncClient() {
       </section>
 
       <section>
-        <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-lg font-medium leading-tight text-gray-800">
           2. Upload photos and videos
         </h2>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1.5 text-sm leading-relaxed text-gray-600">
           Each file name must <strong>start with the stock number</strong>, e.g.{" "}
-          <code className="rounded bg-zinc-100 px-1 text-xs dark:bg-zinc-800">
-            U612099-MKE-1.jpg
-          </code>
-          , <code className="rounded bg-zinc-100 px-1 text-xs dark:bg-zinc-800">
-            U612099_MKE-02.mp4
-          </code>
+          <code className="rounded bg-gray-100 px-1.5 text-xs">U612099-MKE-1.jpg</code>
+          , <code className="rounded bg-gray-100 px-1.5 text-xs">U612099_MKE-02.mp4</code>
           . You can select many files at once, or a whole folder. Files go to
           Supabase <code className="text-xs">bike-media</code> and are linked to
           the matching bike.
         </p>
-        <div className="mt-4">
+        <div className="mt-3">
           <BulkMediaUploader key={mediaKey} />
         </div>
       </section>

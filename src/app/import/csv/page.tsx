@@ -1,35 +1,47 @@
 import Link from "next/link";
+import { AppLayout } from "@/components/app/app-layout";
+import { PageHeader } from "@/components/app/page-header";
+import { buttonSecondary } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { InventorySyncClient } from "./InventorySyncClient";
 
 export default function CsvImportPage() {
   return (
-    <main className="mx-auto max-w-3xl flex-1 px-4 py-10">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          CSV and media
-        </h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Import your inventory file, then attach photos and videos. Stock numbers
-          in filenames must match the <strong>Stock Number</strong> column in the
-          CSV.
-        </p>
-        <p className="mt-3 text-sm">
+    <>
+      <PageHeader
+        title="Import CSV & media"
+        description="The same flow as Media—replace a catalog, then attach files named with stock numbers."
+        action={
           <Link
-            href="/import"
-            className="text-zinc-900 underline dark:text-zinc-100"
+            href="/media"
+            className={buttonSecondary + " hidden sm:inline-flex"}
           >
-            URL / HTML import
+            Media hub
           </Link>
-          {" · "}
-          <Link
-            href="/inventory"
-            className="text-zinc-900 underline dark:text-zinc-100"
-          >
-            View inventory
-          </Link>
-        </p>
-      </div>
-      <InventorySyncClient />
-    </main>
+        }
+      />
+      <AppLayout>
+        <div className="max-w-3xl space-y-4">
+          <p className="text-sm leading-relaxed text-gray-600">
+            <Link
+              href="/import"
+              className="font-medium text-gray-900 underline decoration-gray-300 underline-offset-2"
+            >
+              URL / HTML import
+            </Link>{" "}
+            ·{" "}
+            <Link
+              href="/inventory"
+              className="font-medium text-gray-900 underline decoration-gray-300 underline-offset-2"
+            >
+              View inventory
+            </Link>
+          </p>
+          <Card>
+            <InventorySyncClient />
+          </Card>
+        </div>
+      </AppLayout>
+    </>
   );
 }

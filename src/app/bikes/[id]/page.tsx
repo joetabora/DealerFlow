@@ -1,11 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AppLayout } from "@/components/app/app-layout";
+import { PageHeader } from "@/components/app/page-header";
+import { buttonSecondary } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import type { Bike, BikeMedia } from "@/types/bike";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ id: string }> };
+
+const label = "text-xs font-medium uppercase tracking-wide text-gray-500";
+const value = "mt-0.5 text-sm text-gray-900";
 
 export default async function BikeDetailPage({ params }: Props) {
   const { id } = await params;
@@ -14,15 +22,16 @@ export default async function BikeDetailPage({ params }: Props) {
     supabase = await createClient();
   } catch {
     return (
-      <main className="mx-auto max-w-3xl flex-1 px-4 py-10">
-        <p className="text-sm text-amber-800 dark:text-amber-200">
-          Missing Supabase environment variables. Copy{" "}
-          <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">
-            .env.local.example
-          </code>{" "}
-          to <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">.env.local</code>.
-        </p>
-      </main>
+      <>
+        <PageHeader title="Bike" />
+        <AppLayout>
+          <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-sm leading-relaxed text-amber-900">
+            Missing Supabase environment. Copy{" "}
+            <code className="rounded bg-amber-100/80 px-1">.env.local.example</code>{" "}
+            to <code className="rounded bg-amber-100/80 px-1">.env.local</code>.
+          </p>
+        </AppLayout>
+      </>
     );
   }
 
@@ -45,112 +54,110 @@ export default async function BikeDetailPage({ params }: Props) {
   const media = (mediaRows as BikeMedia[] | null) ?? [];
 
   return (
-    <main className="mx-auto max-w-3xl flex-1 px-4 py-10">
-      <p className="mb-6 text-sm">
-        <Link
-          href="/inventory"
-          className="font-medium text-zinc-900 underline underline-offset-2 dark:text-zinc-100"
-        >
-          ← Inventory
-        </Link>
-      </p>
-      <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-        {bike.title ?? "Untitled"}
-      </h1>
-      <p className="mt-1 font-mono text-sm text-zinc-500">SKU {bike.sku}</p>
+    <>
+      <PageHeader
+        title={bike.title ?? "Untitled bike"}
+        description={`SKU ${bike.sku}`}
+        action={
+          <Link
+            href="/inventory"
+            className={buttonSecondary + " inline-flex"}
+          >
+            Back to inventory
+          </Link>
+        }
+      />
+      <AppLayout>
+        <div className="mx-auto max-w-3xl space-y-5">
+          <Card>
+            <h2 className="text-lg font-medium leading-tight text-gray-800">
+              Details
+            </h2>
+            <dl className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">
+              <div>
+                <dt className={label}>Year</dt>
+                <dd className={value}>{bike.year ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className={label}>Model</dt>
+                <dd className={value}>{bike.model ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className={label}>Price</dt>
+                <dd className={value}>{bike.price ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className={label}>Mileage</dt>
+                <dd className={`${value} tabular-nums`}>
+                  {bike.mileage != null ? bike.mileage.toLocaleString() : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className={label}>Location</dt>
+                <dd className={value}>{bike.location ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className={label}>Status</dt>
+                <dd className="mt-0.5">
+                  <Badge
+                    variant={bike.status === "available" ? "available" : "sold"}
+                  >
+                    {bike.status === "available" ? "Available" : "Sold"}
+                  </Badge>
+                </dd>
+              </div>
+              <div>
+                <dt className={label}>Posts</dt>
+                <dd className={`${value} tabular-nums`}>{bike.post_count}</dd>
+              </div>
+              <div>
+                <dt className={label}>Last posted</dt>
+                <dd className={value}>
+                  {bike.last_posted_at
+                    ? new Date(bike.last_posted_at).toLocaleString()
+                    : "Never"}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className={label}>Description</dt>
+                <dd className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                  {bike.description ?? "—"}
+                </dd>
+              </div>
+            </dl>
+          </Card>
 
-      <dl className="mt-8 grid gap-4 sm:grid-cols-2">
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Year
-          </dt>
-          <dd className="mt-1 text-sm tabular-nums">{bike.year ?? "—"}</dd>
+          {media.length > 0 ? (
+            <div>
+              <h2 className="text-lg font-medium leading-tight text-gray-800">
+                Media
+              </h2>
+              <ul className="mt-3 grid list-none gap-3 sm:grid-cols-2">
+                {media.map((m) => (
+                  <li key={m.id}>
+                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                      {m.type === "image" ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={m.file_url}
+                          alt=""
+                          className="aspect-[4/3] w-full object-cover"
+                        />
+                      ) : (
+                        <video
+                          src={m.file_url}
+                          controls
+                          className="aspect-[4/3] w-full object-cover"
+                        />
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Model
-          </dt>
-          <dd className="mt-1 text-sm">{bike.model ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Price
-          </dt>
-          <dd className="mt-1 text-sm">{bike.price ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Mileage
-          </dt>
-          <dd className="mt-1 text-sm tabular-nums">
-            {bike.mileage != null ? bike.mileage.toLocaleString() : "—"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Location
-          </dt>
-          <dd className="mt-1 text-sm">{bike.location ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Status
-          </dt>
-          <dd className="mt-1 text-sm capitalize">{bike.status}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Post count
-          </dt>
-          <dd className="mt-1 text-sm tabular-nums">{bike.post_count}</dd>
-        </div>
-        <div className="sm:col-span-2">
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Last posted
-          </dt>
-          <dd className="mt-1 text-sm">
-            {bike.last_posted_at
-              ? new Date(bike.last_posted_at).toLocaleString()
-              : "Never"}
-          </dd>
-        </div>
-        <div className="sm:col-span-2">
-          <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Description
-          </dt>
-          <dd className="mt-1 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
-            {bike.description ?? "—"}
-          </dd>
-        </div>
-      </dl>
-
-      {media.length > 0 ? (
-        <div className="mt-10">
-          <h2 className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-            Media
-          </h2>
-          <ul className="mt-3 grid list-none gap-3 sm:grid-cols-2">
-            {media.map((m) => (
-              <li key={m.id} className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
-                {m.type === "image" ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={m.file_url}
-                    alt=""
-                    className="h-48 w-full object-cover"
-                  />
-                ) : (
-                  <video
-                    src={m.file_url}
-                    controls
-                    className="h-48 w-full object-cover"
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </main>
+      </AppLayout>
+    </>
   );
 }

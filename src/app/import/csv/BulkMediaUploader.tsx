@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { buttonSecondary } from "@/components/ui/button";
 import { readDropDataTransfer } from "@/lib/inventory/readDropDataTransfer";
 import {
   isVideoFile,
@@ -150,15 +151,15 @@ export function BulkMediaUploader() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <div
         onDragOver={onDragOver}
         onDrop={(e) => {
           void onDrop(e);
         }}
-        className="relative rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 px-4 py-8 dark:border-zinc-700 dark:bg-zinc-950/50"
+        className="relative rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-8"
       >
-        <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-center text-sm text-gray-600">
           <strong>Drag and drop</strong> one or more{" "}
           <strong>folders</strong> named with the stock number (e.g.{" "}
           <code className="text-xs">U612099-MKE</code> with images inside), or a
@@ -166,26 +167,26 @@ export function BulkMediaUploader() {
           individual files; matching still uses a stock prefix on the name if
           the path is flat.
         </p>
-        <p className="mt-2 text-center text-xs text-zinc-500">
+        <p className="mt-2 text-center text-xs text-gray-500">
           Chrome or Edge work best for folder drops.
         </p>
       </div>
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-2.5">
         <div>
-          <label className="block text-xs font-medium text-zinc-500">
-            Files
-          </label>
-          <input
-            type="file"
-            multiple
-            accept="image/*,video/*"
-            disabled={working}
-            onChange={(e) => void onFiles(e.target.files)}
-            className="mt-1 block text-sm"
-          />
-        </div>
+            <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">
+              Files
+            </label>
+            <input
+              type="file"
+              multiple
+              accept="image/*,video/*"
+              disabled={working}
+              onChange={(e) => void onFiles(e.target.files)}
+              className="mt-0.5 block w-full min-w-0 text-sm"
+            />
+          </div>
         <div>
-          <label className="block text-xs font-medium text-zinc-500">
+          <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">
             Or folder
           </label>
           <input
@@ -195,32 +196,32 @@ export function BulkMediaUploader() {
             accept="image/*,video/*"
             disabled={working}
             onChange={(e) => void onFiles(e.target.files)}
-            className="mt-1 block text-sm"
+            className="mt-0.5 block w-full min-w-0 text-sm"
           />
         </div>
         <button
           type="button"
           onClick={() => void load()}
-          className="rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-600"
+          className={buttonSecondary}
         >
           Refresh stock list
         </button>
       </div>
       {skus && (
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-gray-500">
           Loaded {skus.length} stock number(s) from the database.
         </p>
       )}
       {err && (
-        <p className="text-sm text-red-700 dark:text-red-400">{err}</p>
+        <p className="text-sm text-red-700">{err}</p>
       )}
       {working && <p className="text-sm">Uploading…</p>}
       {log && log.length > 0 && (
-        <ul className="max-h-60 overflow-y-auto rounded border border-zinc-200 text-xs dark:border-zinc-800">
+        <ul className="max-h-60 overflow-y-auto rounded-2xl border border-gray-200 text-xs">
           {log.map((l, i) => (
             <li
               key={i}
-              className="border-b border-zinc-100 px-2 py-1 font-mono last:border-0 dark:border-zinc-900"
+              className="border-b border-gray-100 px-2 py-1 font-mono last:border-0"
             >
               {l.state === "ok" && (
                 <span className="text-emerald-600">ok</span>

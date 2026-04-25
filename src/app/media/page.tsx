@@ -3,41 +3,38 @@ import { AppLayout } from "@/components/app/app-layout";
 import { PageHeader } from "@/components/app/page-header";
 import { buttonSecondary } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ImportForm } from "./ImportForm";
+import { InventorySyncClient } from "@/app/import/csv/InventorySyncClient";
 
-export default function ImportPage() {
+export default function MediaPage() {
   return (
     <>
       <PageHeader
-        title="URL import"
-        description="Scrape listing HTML with cheerio, upsert by SKU. Use paste-HTML if the server returns 403."
+        title="Media"
+        description="Sync inventory, then drop folders or files so filenames match your stock numbers."
         action={
           <Link
-            href="/import/csv"
+            href="/import"
             className={buttonSecondary + " hidden sm:inline-flex"}
           >
-            CSV &amp; media
+            URL import
           </Link>
         }
       />
       <AppLayout>
         <div className="max-w-3xl space-y-4">
           <p className="text-sm text-gray-600">
-            Per-domain CSS selectors live in{" "}
-            <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">
-              src/lib/scrape/registry.ts
-            </code>
-            . After import, open{" "}
+            Stock numbers in filenames must match the{" "}
+            <strong>Stock Number</strong> column in your CSV.{" "}
             <Link
               href="/inventory"
               className="font-medium text-gray-900 underline decoration-gray-300 underline-offset-2"
             >
-              Inventory
+              View inventory
             </Link>{" "}
-            to review.
+            after upload.
           </p>
           <Card>
-            <ImportForm />
+            <InventorySyncClient />
           </Card>
         </div>
       </AppLayout>

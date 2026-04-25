@@ -43,13 +43,13 @@ export function ImportForm() {
   }
 
   return (
-    <div className="space-y-6">
-      <form onSubmit={onSubmit} className="space-y-3">
-        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+    <div className="space-y-5">
+      <form onSubmit={onSubmit} className="space-y-2.5">
+        <label className="block text-sm font-medium text-gray-800">
           Listing URLs (one per line)
         </label>
         <textarea
-          className="min-h-[200px] w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+          className="min-h-[200px] w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 font-mono text-sm leading-relaxed text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-400"
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="https://dealer.example.com/inventory/unit-12345"
@@ -58,24 +58,19 @@ export function ImportForm() {
         <button
           type="submit"
           disabled={pending || !text.trim()}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+          className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {pending ? "Importing…" : "Scrape and save"}
         </button>
       </form>
 
-      <div
-        className="border-t border-zinc-200 pt-6 dark:border-zinc-800"
-        id="paste-html"
-      >
-        <h2 className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+      <div className="border-t border-gray-200 pt-5" id="paste-html">
+        <h2 className="text-sm font-medium leading-tight text-gray-800">
           Or paste page HTML (Cloudflare / 403)
         </h2>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1.5 text-sm leading-relaxed text-gray-600">
           If you see{" "}
-          <code className="rounded bg-zinc-100 px-1 text-xs dark:bg-zinc-800">
-            HTTP 403
-          </code>{" "}
+          <code className="rounded bg-gray-100 px-1.5 text-xs">HTTP 403</code>{" "}
           above, open the listing in your browser, use{" "}
           <strong>View page source</strong> (or save the fully loaded page as{" "}
           <code className="text-xs">.html</code> and open it in an editor), copy
@@ -84,24 +79,24 @@ export function ImportForm() {
         </p>
         <form
           onSubmit={onPasteSubmit}
-          className="mt-4 space-y-3"
+          className="mt-3 space-y-2.5"
         >
-          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label className="block text-sm font-medium text-gray-800">
             Listing URL (same page the HTML came from)
           </label>
           <input
             type="url"
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            className="w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-400"
             value={pasteUrl}
             onChange={(e) => setPasteUrl(e.target.value)}
             placeholder="https://milwaukeeharley.com/inventory/…"
             disabled={pendingPaste}
           />
-          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label className="block text-sm font-medium text-gray-800">
             Full page HTML
           </label>
           <textarea
-            className="min-h-[180px] w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            className="min-h-[180px] w-full rounded-2xl border border-gray-300 bg-white px-3 py-2 font-mono text-xs text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-400"
             value={pasteHtml}
             onChange={(e) => setPasteHtml(e.target.value)}
             placeholder="&lt;!DOCTYPE html>…"
@@ -110,7 +105,7 @@ export function ImportForm() {
           <button
             type="submit"
             disabled={pendingPaste || !pasteUrl.trim() || !pasteHtml.trim()}
-            className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+            className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {pendingPaste ? "Parsing…" : "Parse HTML and save"}
           </button>
@@ -118,15 +113,13 @@ export function ImportForm() {
         {pasteResult ? (
           <p
             className={`mt-3 text-sm ${
-              pasteResult.ok
-                ? "text-emerald-700 dark:text-emerald-400"
-                : "text-red-700 dark:text-red-400"
+              pasteResult.ok ? "text-green-700" : "text-red-700"
             }`}
           >
             {pasteResult.ok ? (
               <>
                 Saved SKU{" "}
-                <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
+                <code className="rounded bg-gray-100 px-1.5 text-xs">
                   {pasteResult.sku}
                 </code>
               </>
@@ -138,41 +131,43 @@ export function ImportForm() {
       </div>
 
       {error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+        <p className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
       ) : null}
 
       {results && results.length > 0 ? (
-        <div className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
+        <div className="overflow-hidden rounded-2xl border border-gray-200">
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-50 dark:bg-zinc-900">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2 font-medium">URL</th>
-                <th className="px-3 py-2 font-medium">Result</th>
+                <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+                  URL
+                </th>
+                <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Result
+                </th>
               </tr>
             </thead>
             <tbody>
               {results.map((r) => (
                 <tr
                   key={r.url}
-                  className="border-t border-zinc-200 dark:border-zinc-800"
+                  className="border-t border-gray-200"
                 >
-                  <td className="max-w-md break-all px-3 py-2 font-mono text-xs text-zinc-600 dark:text-zinc-400">
+                  <td className="max-w-md break-all px-4 py-2.5 font-mono text-xs text-gray-600">
                     {r.url}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2.5">
                     {r.ok ? (
-                      <span className="text-emerald-700 dark:text-emerald-400">
+                      <span className="text-green-700">
                         Saved SKU{" "}
-                        <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
+                        <code className="rounded bg-gray-100 px-1.5 text-xs">
                           {r.sku}
                         </code>
                       </span>
                     ) : (
-                      <span className="text-red-700 dark:text-red-400">
-                        {r.error}
-                      </span>
+                      <span className="text-red-700">{r.error}</span>
                     )}
                   </td>
                 </tr>
@@ -183,7 +178,7 @@ export function ImportForm() {
       ) : null}
 
       {results && results.length === 0 ? (
-        <p className="text-sm text-zinc-500">Enter at least one URL.</p>
+        <p className="text-sm text-gray-500">Enter at least one URL.</p>
       ) : null}
     </div>
   );
