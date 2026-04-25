@@ -70,11 +70,26 @@ export async function importInventoryFromText(
     };
   }
 
-  const supabase = await createClient();
-  const skusInCsv = new Set(rows.map((r) => r.stock));
+  const availableRows = rows.filter((r) => r.status === "available");
+  if (rows.length > 0 && availableRows.length === 0) {
+    return {
+      ok: false,
+      error:
+        "The file has no available (in-stock) rows — every line is sold. Row(s) with status sold are not imported, and the catalog was not changed. Add at least one available row, or this may be a wrong export.",
+    };
+  }
+  if (availableRows.length > MAX_CSV_BIKES) {
+    return {
+      ok: false,
+      error: `Too many in-stock rows (${availableRows.length}). Max is ${MAX_CSV_BIKES}.`,
+    };
+  }
 
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const batch = rows.slice(i, i + CHUNK).map((r) => ({
+  const supabase = await createClient();
+  const skusInCsv = new Set(availableRows.map((r) => r.stock));
+
+  for (let i = 0; i < availableRows.length; i += CHUNK) {
+    const batch = availableRows.slice(i, i + CHUNK).map((r) => ({
       sku: r.stock,
       title: r.title,
       year: r.year,
@@ -82,7 +97,7 @@ export async function importInventoryFromText(
       mileage: r.mileage,
       price: r.priceText,
       location: r.location,
-      status: r.status,
+      status: "available" as const,
     }));
 
     const { error } = await supabase.from("bikes").upsert(batch, {
@@ -113,5 +128,5 @@ export async function importInventoryFromText(
     }
   }
 
-  return { ok: true, imported: rows.length, removed: toDelete.length };
+  return { ok: true, imported: availableRows.length, removed: toDelete.length };
 }

@@ -4,18 +4,42 @@ import type { Bike } from "@/types/bike";
 
 export const dynamic = "force-dynamic";
 
-async function loadBikes(): Promise<Bike[] | null> {
+type BikeListRow = Bike & { mediaCount: number };
+
+function mediaCountFromRow(row: {
+  media: { count: number }[] | { count: number } | null;
+}): number {
+  const m = row.media;
+  if (m == null) return 0;
+  if (Array.isArray(m)) {
+    const c = m[0]?.count;
+    return typeof c === "number" ? c : 0;
+  }
+  return typeof m.count === "number" ? m.count : 0;
+}
+
+async function loadBikes(): Promise<BikeListRow[] | null> {
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("bikes")
       .select(
-        "id, sku, title, year, model, mileage, price, location, description, status, last_posted_at, post_count, created_at",
+        "id, sku, title, year, model, mileage, price, location, description, status, last_posted_at, post_count, created_at, media(count)",
       )
+      .eq("status", "available")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return (data as Bike[]) ?? [];
+    if (!data?.length) return [];
+    return (data as unknown as (Bike & { media: { count: number }[] | null })[]).map(
+      (r) => {
+        const { media, ...rest } = r;
+        return {
+          ...(rest as Bike),
+          mediaCount: mediaCountFromRow({ media }),
+        };
+      },
+    );
   } catch {
     return null;
   }
@@ -97,7 +121,7 @@ export default async function InventoryPage() {
                 <th className="px-3 py-2 font-medium">Price</th>
                 <th className="px-3 py-2 font-medium">Mileage</th>
                 <th className="px-3 py-2 font-medium">Location</th>
-                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Media</th>
                 <th className="px-3 py-2 font-medium">Last posted</th>
                 <th className="px-3 py-2 font-medium">Posts</th>
                 <th className="px-3 py-2 font-medium" />
@@ -118,7 +142,18 @@ export default async function InventoryPage() {
                     {b.mileage != null ? b.mileage.toLocaleString() : "—"}
                   </td>
                   <td className="px-3 py-2">{b.location ?? "—"}</td>
-                  <td className="px-3 py-2 capitalize">{b.status}</td>
+                  <td className="px-3 py-2">
+                    {b.mediaCount > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-100">
+                        {b.mediaCount} file
+                        {b.mediaCount === 1 ? "" : "s"}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-100">
+                        None
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
                     {b.last_posted_at
                       ? new Date(b.last_posted_at).toLocaleString()
