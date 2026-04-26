@@ -417,10 +417,15 @@ export function BulkMediaUploader() {
           results.push({ name: display, state: "err", detail: insR.message });
           continue;
         }
+        const wasHeic = isHeicFile(file);
         results.push({
           name: display,
           state: "ok",
-          detail: insR.wasDuplicate ? "Already in library (same file URL)" : undefined,
+          detail: insR.wasDuplicate
+            ? "Already in library (same file URL)"
+            : wasHeic
+              ? "Saved as JPEG"
+              : undefined,
         });
       }
       setLog(results);

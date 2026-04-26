@@ -102,11 +102,34 @@ export function isHeicFile(file: File): boolean {
   return /\.hei[cf]$/i.test(file.name);
 }
 
-/** Convert HEIC/HEIF to a JPEG the browser can display everywhere. */
+/**
+ * HEIC/HEIF → JPEG for upload. Tries the server (sharp) first, then heic2any in the
+ * browser, so new uploads are stored as .jpg with correct orientation and decode.
+ */
 export async function heicToJpegBlob(
   file: File,
   quality = 0.9,
 ): Promise<Blob> {
+  if (typeof window !== "undefined" && isHeicFile(file)) {
+    const q = Math.min(100, Math.max(50, Math.round(quality * 100)));
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      const res = await fetch(
+        new URL(
+          `/api/media/convert-to-jpeg?q=${q}`,
+          window.location.origin,
+        ).toString(),
+        { method: "POST", body: fd, credentials: "same-origin" },
+      );
+      if (res.ok) {
+        return await res.blob();
+      }
+    } catch {
+      /* fall through to wasm */
+    }
+  }
+
   let blob: Blob = file;
   if (!file.type || file.type === "application/octet-stream") {
     if (isHeicFile(file)) {
