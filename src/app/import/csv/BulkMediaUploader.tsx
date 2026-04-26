@@ -13,7 +13,6 @@ import {
   transcodeVideoInBrowser,
   useClientFfmpegEnabled,
 } from "@/lib/video/client-transcode";
-import { isHeicFile, heicToJpegBlob } from "@/lib/media/heic";
 import { store720pFromBrowser } from "@/lib/video/store-browser-720p";
 import {
   getMaxDirectVideoUploadBytes,
@@ -34,6 +33,12 @@ type UploadStatus =
 
 const POLL_MS = 2000;
 const POLL_MAX = 90;
+
+function isHeicOrHeifFile(file: File): boolean {
+  const t = file.type.toLowerCase();
+  if (t.includes("heic") || t.includes("heif")) return true;
+  return /\.hei[cf]$/i.test(file.name);
+}
 
 export function BulkMediaUploader() {
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -370,28 +375,18 @@ export function BulkMediaUploader() {
           continue;
         }
 
-        let imageUploadPath = path;
-        let imageBody: File | Blob = file;
-        let imageContentType = file.type || "application/octet-stream";
-        if (isHeicFile(file)) {
-          try {
-            const jpeg = await heicToJpegBlob(file);
-            imageBody = jpeg;
-            imageContentType = "image/jpeg";
-            imageUploadPath = path.replace(/\.(hei[cf])$/i, ".jpg");
-            if (imageUploadPath === path) {
-              imageUploadPath = `${path}.jpg`;
-            }
-          } catch (he) {
-            const msg = he instanceof Error ? he.message : "HEIC conversion failed";
-            results.push({
-              name: display,
-              state: "err",
-              detail: msg,
-            });
-            continue;
-          }
+        if (isHeicOrHeifFile(file)) {
+          results.push({
+            name: display,
+            state: "err",
+            detail:
+              "HEIC/HEIF not supported—export as JPEG in Photos (or use Preview) and upload again.",
+          });
+          continue;
         }
+        const imageUploadPath = path;
+        const imageBody: File | Blob = file;
+        const imageContentType = file.type || "application/octet-stream";
         const { error: up } = await s.storage
           .from("bike-media")
           .upload(imageUploadPath, imageBody, {
@@ -417,15 +412,12 @@ export function BulkMediaUploader() {
           results.push({ name: display, state: "err", detail: insR.message });
           continue;
         }
-        const wasHeic = isHeicFile(file);
         results.push({
           name: display,
           state: "ok",
           detail: insR.wasDuplicate
             ? "Already in library (same file URL)"
-            : wasHeic
-              ? "Saved as JPEG"
-              : undefined,
+            : undefined,
         });
       }
       setLog(results);
