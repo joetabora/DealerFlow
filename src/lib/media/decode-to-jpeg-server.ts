@@ -9,19 +9,10 @@ import {
 } from "@/lib/video/server-transcode";
 
 /**
- * iPhone / multi-mapped HEIC can expose a small preview on page 0. Pick the
- * page with the largest pixel count (full-resolution main image).
+ * If HEIF has multiple image items, use the one with the largest area. Only
+ * pages reported by libvips are considered (no extra probes that can pick
+ * non-image layers and hurt quality).
  */
-async function pagePixelCount(
-  input: Buffer,
-  page: number,
-): Promise<{ px: number; w: number; h: number }> {
-  const m = await sharp(input, { failOn: "none", page, pages: 1 }).metadata();
-  const w = m.width ?? 0;
-  const h = m.height ?? 0;
-  return { px: w * h, w, h };
-}
-
 async function pickLargestHeifPageIndex(input: Buffer): Promise<number> {
   let top: Metadata;
   try {
@@ -29,32 +20,24 @@ async function pickLargestHeifPageIndex(input: Buffer): Promise<number> {
   } catch {
     return 0;
   }
-  const reported = top.pages;
-  const n = reported && reported > 0 ? reported : 1;
+  const n = top.pages;
+  if (n == null || n <= 1) {
+    return 0;
+  }
   let best = 0;
-  let bestPx = 0;
+  let bestArea = 0;
   for (let p = 0; p < n; p++) {
     try {
-      const { px } = await pagePixelCount(input, p);
-      if (px > bestPx) {
-        bestPx = px;
+      const m = await sharp(input, { failOn: "none", page: p, pages: 1 }).metadata();
+      const w = m.width ?? 0;
+      const h = m.height ?? 0;
+      const area = w * h;
+      if (area > bestArea) {
+        bestArea = area;
         best = p;
       }
     } catch {
       /* skip */
-    }
-  }
-  if (bestPx < 400 * 300 && input.length > 200 * 1024) {
-    for (let p = n; p < 12; p++) {
-      try {
-        const { px } = await pagePixelCount(input, p);
-        if (px > bestPx) {
-          bestPx = px;
-          best = p;
-        }
-      } catch {
-        break;
-      }
     }
   }
   return best;
