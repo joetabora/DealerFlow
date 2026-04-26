@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { REPOST_COOLDOWN_DAYS } from "@/lib/engagement";
+import { inCooldown } from "@/lib/scheduling-cooldown";
 import { findNextOpenSlot } from "@/lib/repost-schedule";
 
 export type RepostResult =
@@ -56,6 +57,21 @@ export async function repostBike(postId: string): Promise<RepostResult> {
   }
 
   const slot = await findNextOpenSlot(supabase, p.bike_id);
+  const { data: times } = await supabase
+    .from("posts")
+    .select("scheduled_date")
+    .eq("bike_id", p.bike_id);
+  const st = slot.getTime();
+  for (const r of times ?? []) {
+    const t = new Date((r as { scheduled_date: string }).scheduled_date).getTime();
+    if (t > 0 && inCooldown(st, t)) {
+      return {
+        ok: false,
+        reason: "error" as const,
+        message: "This bike is within 14 days of another scheduled or posted item.",
+      };
+    }
+  }
   const { error: ins } = await supabase.from("posts").insert({
     bike_id: p.bike_id,
     scheduled_date: slot.toISOString(),

@@ -8,7 +8,9 @@ export type SchedulerCell = {
   location: string | null;
   thumbUrl: string | null;
   status: PostStatus;
+  /** Rendered or edited caption; persisted on posts.caption */
+  caption: string | null;
 };
 
 export type LocationFilter = "all" | "milwaukee" | "west-bend";
-export type StatusFilter = "all" | "draft" | "scheduled" | "posted";
+export type StatusFilter = "all" | "draft" | "scheduled";

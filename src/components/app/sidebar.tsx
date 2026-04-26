@@ -9,6 +9,7 @@ const nav = [
   { href: "/inventory", label: "Inventory" },
   { href: "/scheduler", label: "Scheduler" },
   { href: "/media", label: "Media" },
+  { href: "/leaderboard", label: "Leaderboard" },
 ] as const;
 
 export function Sidebar() {
@@ -33,9 +34,11 @@ export function Sidebar() {
               ? pathname === "/"
               : item.href === "/inventory"
                 ? pathname === "/inventory" || pathname.startsWith("/bikes/")
-                : item.href === "/media"
+                :             item.href === "/media"
                   ? pathname === "/media" || pathname === "/import/csv"
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  : item.href === "/leaderboard"
+                    ? pathname === "/leaderboard"
+                    : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}

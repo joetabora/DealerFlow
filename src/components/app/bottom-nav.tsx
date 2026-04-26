@@ -6,9 +6,10 @@ import { cn } from "@/lib/cn";
 import { SHELL_MAX, SHELL_PX } from "./shell-classnames";
 
 const items = [
-  { href: "/", label: "Dashboard", Icon: IconHome },
-  { href: "/inventory", label: "Inventory", Icon: IconInventory },
-  { href: "/scheduler", label: "Scheduler", Icon: IconCalendar },
+  { href: "/", label: "Home", Icon: IconHome },
+  { href: "/inventory", label: "Stock", Icon: IconInventory },
+  { href: "/scheduler", label: "Plan", Icon: IconCalendar },
+  { href: "/leaderboard", label: "Top", Icon: IconTrophy },
   { href: "/media", label: "Media", Icon: IconMedia },
 ] as const;
 
@@ -24,6 +25,9 @@ function isActive(pathname: string, href: string) {
       pathname.startsWith("/import/")
     );
   }
+  if (href === "/leaderboard") {
+    return pathname === "/leaderboard";
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -38,7 +42,7 @@ export function BottomNav() {
         className={cn(
           SHELL_MAX,
           SHELL_PX,
-          "grid h-14 grid-cols-4",
+          "grid h-14 min-h-14 grid-cols-5",
         )}
       >
         {items.map(({ href, label, Icon }) => {
@@ -128,6 +132,30 @@ function IconCalendar({ active }: { active: boolean }) {
       <path d="M3 10h18" />
       <path d="M8 3v3M16 3v3" strokeLinecap="round" />
       <rect x="7" y="13" width="3" height="3" rx="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function IconTrophy({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={active ? 2.1 : 1.7}
+      aria-hidden
+    >
+      <path
+        d="M8 4h8v2a4 4 0 0 0 4 4v1H4V10a4 4 0 0 0 4-4V4Z"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 6V4M14 6V4M9 20h6l-1-4H10l-1 4Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

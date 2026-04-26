@@ -124,6 +124,15 @@ export default async function Home() {
               >
                 Generate week
               </Link>
+              <Link
+                href="/leaderboard"
+                className={
+                  buttonSecondary +
+                  " w-full min-h-14 text-center text-base font-medium active:scale-[0.97] sm:min-h-9 sm:text-sm"
+                }
+              >
+                Leaderboard
+              </Link>
             </div>
             <p className="mt-3 text-sm text-gray-500">
               <Link

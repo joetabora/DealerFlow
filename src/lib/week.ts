@@ -48,3 +48,18 @@ export function isSameLocalDay(a: Date, b: Date): boolean {
 }
 
 export const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+/**
+ * 0 = Monday of `weekStart` (local), … 6 = Sunday, if `instant` is on that calendar day.
+ * Returns -1 if `instant` is not in the same local week as `weekStart`.
+ */
+export function localDayIndexInWeek(weekStart: Date, instant: Date): number {
+  const a = new Date(weekStart);
+  a.setHours(0, 0, 0, 0);
+  for (let d = 0; d < 7; d++) {
+    const x = new Date(a);
+    x.setDate(x.getDate() + d);
+    if (isSameLocalDay(x, instant)) return d;
+  }
+  return -1;
+}

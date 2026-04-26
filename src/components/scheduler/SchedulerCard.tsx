@@ -20,10 +20,22 @@ type Props = {
   dimmed?: boolean;
   /** e.g. "9:00 AM" for the slot */
   timeLabel?: string;
+  onCaptionChange?: (text: string) => void;
+  /** If set, called on blur to persist (e.g. full-week save). */
+  onCaptionCommit?: () => void;
 } & React.HTMLAttributes<HTMLDivElement>;
 
 export const SchedulerCard = forwardRef<HTMLDivElement, Props>(function SchedulerCard(
-  { cell, className, style, dimmed, timeLabel, ...rest },
+    {
+    cell,
+    className,
+    style,
+    dimmed,
+    timeLabel,
+    onCaptionChange,
+    onCaptionCommit,
+    ...rest
+  },
   ref,
 ) {
   return (
@@ -80,6 +92,21 @@ export const SchedulerCard = forwardRef<HTMLDivElement, Props>(function Schedule
         <p className="line-clamp-1 text-xs text-gray-500 sm:mt-0 max-md:mt-0.5">
           {cell.location || "—"}
         </p>
+        {onCaptionChange != null ? (
+          <label className="mt-1.5 block">
+            <span className="text-[9px] font-medium uppercase text-gray-400">
+              Caption
+            </span>
+            <textarea
+              className="mt-0.5 w-full resize-y min-h-12 rounded-md border border-gray-200 bg-gray-50/80 px-1.5 py-1 text-[12px] leading-snug text-gray-800 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-200"
+              value={cell.caption ?? ""}
+              onChange={(e) => onCaptionChange(e.target.value)}
+              onBlur={() => onCaptionCommit?.()}
+              rows={2}
+              onPointerDown={(e) => e.stopPropagation()}
+            />
+          </label>
+        ) : null}
       </div>
       <div className="shrink-0 self-start">
         <Badge

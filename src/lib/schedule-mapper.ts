@@ -10,6 +10,7 @@ type PostIn = {
   price: string | null;
   location: string | null;
   thumb: string | null;
+  caption: string | null;
 };
 
 /**
@@ -53,6 +54,7 @@ export function mapPostsToGrid(weekStart: Date, posts: PostIn[]): (SchedulerCell
         location: p.location?.trim() ?? null,
         thumbUrl: p.thumb,
         status: p.status as SchedulerCell["status"],
+        caption: p.caption,
       };
     }
   }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppLayout } from "@/components/app/app-layout";
 import { PageHeader } from "@/components/app/page-header";
-import { buttonSecondary } from "@/components/ui/button";
+import { buttonPrimary, buttonSecondary } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BikeMediaGallery } from "@/components/bike/bike-media-gallery";
 import { Card } from "@/components/ui/card";
@@ -60,12 +60,20 @@ export default async function BikeDetailPage({ params }: Props) {
         title={bike.title ?? "Untitled bike"}
         description={`SKU ${bike.sku}`}
         action={
-          <Link
-            href="/inventory"
-            className={buttonSecondary + " inline-flex"}
-          >
-            Back to inventory
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/scheduler?addBike=${id}`}
+              className={buttonPrimary + " inline-flex min-h-10 text-center text-sm font-medium sm:min-h-9"}
+            >
+              Add to schedule
+            </Link>
+            <Link
+              href="/inventory"
+              className={buttonSecondary + " inline-flex min-h-10 text-sm sm:min-h-9"}
+            >
+              Back to inventory
+            </Link>
+          </div>
         }
       />
       <AppLayout>

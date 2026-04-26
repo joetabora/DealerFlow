@@ -14,11 +14,21 @@ import {
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { mapPostsToGrid } from "@/lib/schedule-mapper";
 import {
   buildApplyFlat,
   buildGenerateApplyFlat,
+  buildGenerateDayApplyFlat,
   hasDuplicateBikesOnSameDay,
   weekRange,
 } from "@/lib/schedule-apply";
@@ -32,6 +42,7 @@ import { cn } from "@/lib/cn";
 import {
   applyWeek,
   clearWeek,
+  getSchedulerPayloadForBike,
   getSchedulerPosts,
   getSlotPlan,
   listBikesForSchedule,
@@ -133,9 +144,21 @@ type FilledProps = {
   locFilter: LocationFilter;
   stFilter: StatusFilter;
   timeLabel: string;
+  onCaptionUpdate: (d: number, s: number, text: string) => void;
+  onCaptionCommit: () => void;
 };
 
-function FilledSlot({ d, s, cell, overRing, locFilter, stFilter, timeLabel }: FilledProps) {
+function FilledSlot({
+  d,
+  s,
+  cell,
+  overRing,
+  locFilter,
+  stFilter,
+  timeLabel,
+  onCaptionUpdate,
+  onCaptionCommit,
+}: FilledProps) {
   const dropId = `drop-${d}-${s}`;
   const dragId = `drag-${d}-${s}`;
   const { setNodeRef: setDrop, isOver: overDrop } = useDroppable({ id: dropId });
@@ -173,6 +196,8 @@ function FilledSlot({ d, s, cell, overRing, locFilter, stFilter, timeLabel }: Fi
           dimmed={dimmed}
           timeLabel={timeLabel}
           className="cursor-grab active:scale-[0.99] active:cursor-grabbing"
+          onCaptionChange={(t) => onCaptionUpdate(d, s, t)}
+          onCaptionCommit={onCaptionCommit}
         />
       </div>
     </div>
@@ -188,10 +213,13 @@ type SlotCellProps = {
   stFilter: StatusFilter;
   monday: Date;
   hoursByDay: number[][];
+  onCaptionUpdate: (d: number, s: number, text: string) => void;
+  onCaptionCommit: () => void;
 };
 
 function SlotCell(props: SlotCellProps) {
-  const { d, s, overRing, locFilter, stFilter, monday, hoursByDay } = props;
+  const { d, s, overRing, locFilter, stFilter, monday, hoursByDay, onCaptionUpdate, onCaptionCommit } =
+    props;
   const timeHint = formatSlotTime(monday, d, s, hoursByDay);
   if (props.cell) {
     return (
@@ -203,6 +231,8 @@ function SlotCell(props: SlotCellProps) {
         locFilter={locFilter}
         stFilter={stFilter}
         timeLabel={timeHint}
+        onCaptionUpdate={onCaptionUpdate}
+        onCaptionCommit={onCaptionCommit}
       />
     );
   }
@@ -214,11 +244,18 @@ const empty7x4 = () =>
 
 export default function SchedulerClient() {
   const { show } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [monday] = useState(() => getMonday(new Date()));
   const [grid, setGrid] = useState<(SchedulerCell | null)[][]>(empty7x4);
+  const gridRef = useRef(grid);
+  useLayoutEffect(() => {
+    gridRef.current = grid;
+  }, [grid]);
   const [hoursByDay, setHoursByDay] = useState<number[][]>(() => defaultHoursByDay());
   const [locFilter, setLocFilter] = useState<LocationFilter>("all");
   const [stFilter, setStFilter] = useState<StatusFilter>("all");
+  const [dayToGen, setDayToGen] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeCell, setActiveCell] = useState<SchedulerCell | null>(null);
   const [overRing, setOverRing] = useState(false);
@@ -248,6 +285,7 @@ export default function SchedulerClient() {
       price: p.price,
       location: p.location,
       thumb: p.thumb,
+      caption: p.caption,
     }));
     setGrid(mapPostsToGrid(monday, posts));
   }, [from, to, monday]);
@@ -272,6 +310,7 @@ export default function SchedulerClient() {
         price: p.price,
         location: p.location,
         thumb: p.thumb,
+        caption: p.caption,
       }));
       setGrid(mapPostsToGrid(monday, posts));
       setIsBoot(false);
@@ -302,6 +341,22 @@ export default function SchedulerClient() {
     },
     [from, to, monday, hoursByDay, show, reload],
   );
+
+  const onCaptionUpdate = useCallback(
+    (d: number, s: number, text: string) => {
+      setGrid((g) => {
+        const n = g.map((row) => row.map((c) => c));
+        const cur = n[d]![s];
+        if (cur) n[d]![s] = { ...cur, caption: text };
+        return n;
+      });
+    },
+    [],
+  );
+
+  const onCaptionCommit = useCallback(() => {
+    persist(gridRef.current);
+  }, [persist]);
 
   const onDragStart = (e: DragStartEvent) => {
     setOverRing(true);
@@ -338,7 +393,7 @@ export default function SchedulerClient() {
   const onGenerate = useCallback(() => {
     startTransition(async () => {
       const [b, plan] = await Promise.all([
-        listBikesForSchedule(locFilter),
+        listBikesForSchedule(from, to, locFilter, { type: "replaceEntireWorkWeek" }),
         getSlotPlan(),
       ]);
       const h = plan.ok ? plan.hoursByDay : defaultHoursByDay();
@@ -348,13 +403,19 @@ export default function SchedulerClient() {
         return;
       }
       if (b.bikes.length === 0) {
-        show("No available bikes for this location filter.", "error");
+        show("No in-stock units with media for this location filter. Upload photos first.", "error");
         return;
       }
-      const flat = buildGenerateApplyFlat(monday, b.bikes, h);
+      const flat = buildGenerateApplyFlat(
+        monday,
+        b.bikes,
+        h,
+        b.anchorPosts,
+        locFilter,
+      );
       const r = await applyWeek(from, to, flat);
       if (r.ok) {
-        show("Week generated with optimized posting times. Drag to adjust.", "success");
+        show("Week generated (14-day rule, media, balance). Edit captions and drag to adjust.", "success");
         await reload();
       } else {
         show(r.error, "error");
@@ -362,6 +423,46 @@ export default function SchedulerClient() {
       }
     });
   }, [from, to, monday, locFilter, show, reload]);
+
+  const onGenerateDay = useCallback(() => {
+    startTransition(async () => {
+      const [b, plan] = await Promise.all([
+        listBikesForSchedule(from, to, locFilter, {
+          type: "replaceDayInWeek",
+          dayIndex: dayToGen,
+        }),
+        getSlotPlan(),
+      ]);
+      const h = plan.ok ? plan.hoursByDay : defaultHoursByDay();
+      if (plan.ok) setHoursByDay(plan.hoursByDay);
+      if (!b.ok) {
+        show(b.error, "error");
+        return;
+      }
+      if (b.bikes.length === 0) {
+        show("No in-stock units with media for this filter. Upload photos first.", "error");
+        return;
+      }
+      const g = gridRef.current;
+      const flat = buildGenerateDayApplyFlat(
+        monday,
+        dayToGen,
+        b.bikes,
+        h,
+        b.anchorPosts,
+        locFilter,
+        g,
+      );
+      const r = await applyWeek(from, to, flat);
+      if (r.ok) {
+        show("Day generated. Open captions below each card to edit.", "success");
+        await reload();
+      } else {
+        show(r.error, "error");
+        await reload();
+      }
+    });
+  }, [from, to, monday, locFilter, dayToGen, show, reload]);
 
   const onClear = useCallback(() => {
     startTransition(async () => {
@@ -375,6 +476,52 @@ export default function SchedulerClient() {
       }
     });
   }, [from, to, show, reload]);
+
+  useEffect(() => {
+    if (isBoot) return;
+    const id = searchParams.get("addBike");
+    if (!id?.trim()) return;
+    let gone = false;
+    (async () => {
+      const r = await getSchedulerPayloadForBike(id.trim());
+      if (gone) return;
+      if (!r.ok) {
+        show(r.error, "error");
+        router.replace("/scheduler", { scroll: false });
+        return;
+      }
+      const cell = r.cell;
+      setGrid((g) => {
+        const n = g.map((row) => row.map((c) => c));
+        for (let d = 0; d < 7; d++) {
+          for (let s = 0; s < 4; s++) {
+            if (n[d]![s] == null) {
+              n[d]![s] = cell;
+              const nd = d;
+              queueMicrotask(() => {
+                persist(n);
+                router.replace("/scheduler", { scroll: false });
+                show(
+                  "Added to the first open slot. Edit the caption or drag the card to move it.",
+                  "success",
+                );
+                document
+                  .getElementById(`scheduler-day-${nd}`)
+                  ?.scrollIntoView({ behavior: "smooth" });
+              });
+              return n;
+            }
+          }
+        }
+        show("This week is full. Clear a slot or clear the week first.", "error");
+        router.replace("/scheduler", { scroll: false });
+        return g;
+      });
+    })();
+    return () => {
+      gone = true;
+    };
+  }, [isBoot, searchParams, show, router, persist]);
 
   if (isBoot) {
     return (
@@ -400,7 +547,34 @@ export default function SchedulerClient() {
       <PageHeader
         title="Scheduler"
         action={
-          <div className="hidden flex-wrap items-center justify-end gap-2 md:flex">
+            <div className="hidden flex-wrap items-center justify-end gap-2 md:flex">
+            <div className="flex flex-wrap items-end gap-1.5">
+              <div>
+                <span className="mb-0.5 block text-[10px] font-medium text-gray-500">
+                  Day
+                </span>
+                <select
+                  className="h-9 min-w-[4.5rem] rounded-lg border border-gray-300 bg-white px-2 text-sm"
+                  value={dayToGen}
+                  onChange={(e) => setDayToGen(+e.target.value)}
+                  disabled={isPending}
+                >
+                  {dayLabels.map((L, i) => (
+                    <option key={L} value={i}>
+                      {L}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={onGenerateDay}
+                className={buttonPrimary}
+                disabled={isPending}
+              >
+                {isPending ? "…" : "Generate day"}
+              </button>
+            </div>
             <button
               type="button"
               onClick={onGenerate}
@@ -465,7 +639,6 @@ export default function SchedulerClient() {
                     <option value="all">All</option>
                     <option value="draft">Draft</option>
                     <option value="scheduled">Scheduled</option>
-                    <option value="posted">Posted</option>
                   </select>
                 </div>
                 <button
@@ -522,6 +695,8 @@ export default function SchedulerClient() {
                               stFilter={stFilter}
                               monday={monday}
                               hoursByDay={hoursByDay}
+                              onCaptionUpdate={onCaptionUpdate}
+                              onCaptionCommit={onCaptionCommit}
                             />
                           </div>
                         ))}
@@ -576,7 +751,7 @@ export default function SchedulerClient() {
               href="/inventory"
               className={buttonSecondary + " min-h-12 flex-1 text-center text-base font-medium active:scale-[0.97]"}
             >
-              + Add post
+              Pick bike
             </Link>
           </div>
         </div>

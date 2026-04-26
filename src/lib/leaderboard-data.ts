@@ -25,8 +25,20 @@ function effectivePostedAt(postedAt: string | null, scheduledDate: string): Date
   return Number.isNaN(d.getTime()) ? new Date(scheduledDate) : d;
 }
 
+export type LeaderboardTimeRange = "week" | "month" | "all";
+
+function rangeStart(r: LeaderboardTimeRange): Date | null {
+  if (r === "all") return null;
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (r === "week") d.setDate(d.getDate() - 7);
+  if (r === "month") d.setMonth(d.getMonth() - 1);
+  return d;
+}
+
 export async function getTopPerformingPosts(
   limit = 8,
+  timeRange: LeaderboardTimeRange = "all",
 ): Promise<{ rows: LeaderboardRow[]; error: string | null }> {
   const defaults = { rows: [] as LeaderboardRow[], error: null as string | null };
   let supabase;
@@ -36,13 +48,15 @@ export async function getTopPerformingPosts(
     return { ...defaults, error: "config" };
   }
 
+  const rs = rangeStart(timeRange);
   const { data, error } = await supabase
     .from("posts")
     .select(
       "id, bike_id, likes, comments, posted_at, scheduled_date, bikes ( title, location )",
     )
     .eq("status", "posted")
-    .limit(120);
+    .order("engagement_score", { ascending: false })
+    .limit(200);
 
   if (error) {
     return { ...defaults, error: error.message };
@@ -50,7 +64,14 @@ export async function getTopPerformingPosts(
 
   const raw = (data ?? []) as unknown;
 
-  const scored = (Array.isArray(raw) ? raw : [])
+  const withRange = (Array.isArray(raw) ? raw : []).filter((row) => {
+    if (rs == null) return true;
+    const p = row as { posted_at: string | null; scheduled_date: string };
+    const at = effectivePostedAt(p.posted_at, p.scheduled_date);
+    return at.getTime() >= rs.getTime();
+  });
+
+  const scored = withRange
     .map((row) => {
       const p = row as {
         id: string;
