@@ -13,6 +13,10 @@ import {
   transcodeVideoInBrowser,
   useClientFfmpegEnabled,
 } from "@/lib/video/client-transcode";
+import { store720pFromBrowser } from "@/lib/video/store-browser-720p";
+import {
+  getMaxDirectVideoUploadBytes,
+} from "@/lib/video/upload-policy";
 
 type SkuId = { sku: string; id: string };
 
@@ -160,6 +164,18 @@ export function BulkMediaUploader() {
     const results: UploadStatus[] = [];
     const newPending: string[] = [];
     const clientMode = useClientFfmpeg;
+    const maxDirectBytes = getMaxDirectVideoUploadBytes();
+
+    function isStorageSizeRejection(message: string): boolean {
+      return /exceeded|maximum|too large|size limit/i.test(message);
+    }
+
+    function storageErrDetail(message: string): string {
+      if (isStorageSizeRejection(message)) {
+        return `${message} (Try raising the limit in Supabase → Project Settings → Storage, or set NEXT_PUBLIC_MAX_DIRECT_VIDEO_UPLOAD_MB to match your cap so we compress in-browser first.)`;
+      }
+      return message;
+    }
 
     try {
       for (const { file, relPath } of items) {
@@ -182,7 +198,30 @@ export function BulkMediaUploader() {
         const path = `${encodeURIComponent(sku)}/${objectName}`;
         const isVideo = isVideoFile(file);
 
-        if (isVideo && clientMode) {
+        if (isVideo && file.size > maxDirectBytes) {
+          const r = await store720pFromBrowser(s, {
+            bikeId,
+            sku,
+            objectName,
+            file,
+            maxOutputBytes: maxDirectBytes,
+          });
+          if (r.ok) {
+            results.push({
+              name: display,
+              state: "video",
+              mediaId: r.mediaId,
+              job: "ready",
+              detail:
+                "720p in browser, then stored (avoids Supabase’s max file size on the full original)",
+            });
+            continue;
+          }
+          results.push({ name: display, state: "err", detail: r.error });
+          continue;
+        }
+
+        if (isVideo && clientMode && file.size <= maxDirectBytes) {
           try {
             const blob = await transcodeVideoInBrowser(file);
             const origStoragePath = `${encodeURIComponent(sku)}/o-${objectName}`;
@@ -197,7 +236,7 @@ export function BulkMediaUploader() {
               results.push({
                 name: display,
                 state: "err",
-                detail: upOrig.message,
+                detail: storageErrDetail(upOrig.message),
               });
               continue;
             }
@@ -214,7 +253,7 @@ export function BulkMediaUploader() {
               results.push({
                 name: display,
                 state: "err",
-                detail: upC.message,
+                detail: storageErrDetail(upC.message),
               });
               continue;
             }
@@ -259,7 +298,30 @@ export function BulkMediaUploader() {
               contentType: file.type || undefined,
             });
           if (up) {
-            results.push({ name: display, state: "err", detail: up.message });
+            if (isStorageSizeRejection(up.message)) {
+              const r2 = await store720pFromBrowser(s, {
+                bikeId,
+                sku,
+                objectName,
+                file,
+                maxOutputBytes: maxDirectBytes,
+              });
+              if (r2.ok) {
+                results.push({
+                  name: display,
+                  state: "video",
+                  mediaId: r2.mediaId,
+                  job: "ready",
+                  detail: "Direct upload was over your storage limit, so 720p was used in the browser",
+                });
+                continue;
+              }
+            }
+            results.push({
+              name: display,
+              state: "err",
+              detail: storageErrDetail(up.message),
+            });
             continue;
           }
           const { data: pub } = s.storage.from("bike-media").getPublicUrl(path);
@@ -384,10 +446,13 @@ export function BulkMediaUploader() {
           the path is flat.
         </p>
         <p className="mt-2 text-center text-xs text-gray-500">
-          Chrome or Edge work best for folder drops.{" "}
-          {useClientFfmpeg
-            ? "Client-side video compression is on (set in env)."
-            : "Large videos: originals upload first, then server compresses to 720p in the background (requires FFmpeg on the host)."}
+          Chrome or Edge work best for folder drops. Videos over{" "}
+          {(getMaxDirectVideoUploadBytes() / (1024 * 1024)).toFixed(0)}MB (see{" "}
+          <code className="text-[10px]">NEXT_PUBLIC_MAX_DIRECT_VIDEO_UPLOAD_MB</code>
+          ) are compressed in the browser to 720p, then the smaller file is
+          uploaded so it fits typical Supabase Storage limits. Smaller videos can
+          upload as-is, then the server can transcode in the background (if FFmpeg
+          is available). {useClientFfmpeg ? " Optional env also forces in-browser 720p for all sizes." : ""}
         </p>
       </div>
       <div className="flex flex-wrap items-end gap-2.5">

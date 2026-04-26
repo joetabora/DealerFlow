@@ -1,7 +1,7 @@
 /**
- * Optional browser-side transcode (ffmpeg.wasm) when server env has no ffmpeg.
- * Heavy first load: loads @ffmpeg/core from unpkg. Enable with
- * NEXT_PUBLIC_USE_CLIENT_FFMPEG=1
+ * Browser-side 720p transcode (ffmpeg.wasm). Loaded from unpkg on first use.
+ * Used when a file is over `NEXT_PUBLIC_MAX_DIRECT_VIDEO_UPLOAD_MB`, on
+ * NEXT_PUBLIC_USE_CLIENT_FFMPEG=1, or when Supabase rejects the direct upload as too large.
  */
 export function useClientFfmpegEnabled(): boolean {
   return process.env.NEXT_PUBLIC_USE_CLIENT_FFMPEG === "1";
