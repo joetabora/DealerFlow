@@ -121,10 +121,36 @@ export function urlLooksHeic(href: string | null | undefined): boolean {
   return /\.(hei[cf])(\?|#|$)/i.test(href);
 }
 
+function heicPreviewRequestUrl(publicUrl: string, quality: number): string {
+  const q = Math.min(100, Math.max(50, Math.round(quality * 100)));
+  const u = new URL("/api/media/heic-preview", window.location.origin);
+  u.searchParams.set("url", publicUrl);
+  u.searchParams.set("q", String(q));
+  return u.toString();
+}
+
+/**
+ * Decode for display: prefer server (sharp → JPEG) so current iPhone HEIC works in
+ * Chrome; fall back to heic2any WASM if the API is unavailable.
+ */
 export async function heicUrlToJpegObjectUrl(
   publicUrl: string,
   quality = 0.9,
 ): Promise<string> {
+  if (typeof window === "undefined") {
+    throw new Error("HEIC display conversion runs in the browser");
+  }
+  try {
+    const res = await fetch(heicPreviewRequestUrl(publicUrl, quality), {
+      credentials: "same-origin",
+    });
+    if (res.ok) {
+      const jpg = await res.blob();
+      return URL.createObjectURL(jpg);
+    }
+  } catch {
+    /* try wasm */
+  }
   const blob = await fetchHeicBlobFromPublicUrl(publicUrl);
   const out = await heicLikeBlobToJpegOrPng(blob, quality);
   return URL.createObjectURL(out);
