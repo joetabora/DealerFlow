@@ -20,20 +20,18 @@ type Props = {
   dimmed?: boolean;
   /** e.g. "9:00 AM" for the slot */
   timeLabel?: string;
-  onCaptionChange?: (text: string) => void;
-  /** If set, called on blur to persist (e.g. full-week save). */
-  onCaptionCommit?: () => void;
+  /** Open full caption editor; drag is on a separate handle so this is clickable. */
+  onRequestEdit?: () => void;
 } & React.HTMLAttributes<HTMLDivElement>;
 
 export const SchedulerCard = forwardRef<HTMLDivElement, Props>(function SchedulerCard(
-    {
+  {
     cell,
     className,
     style,
     dimmed,
     timeLabel,
-    onCaptionChange,
-    onCaptionCommit,
+    onRequestEdit,
     ...rest
   },
   ref,
@@ -43,9 +41,9 @@ export const SchedulerCard = forwardRef<HTMLDivElement, Props>(function Schedule
       ref={ref}
       style={style}
       className={cn(
-        "flex w-full min-w-0 items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition duration-200",
-        "min-h-[4.5rem] active:scale-[0.99] sm:min-h-0",
-        "max-md:px-3.5 max-md:py-3.5",
+        "flex w-full min-w-0 items-center gap-2 rounded-xl border border-gray-200 bg-white p-2.5 shadow-sm transition duration-200 sm:gap-3 sm:p-3",
+        "min-h-[4.5rem] sm:min-h-0",
+        "max-md:px-2.5 max-md:py-2.5",
         dimmed && "opacity-35",
         className,
       )}
@@ -73,17 +71,31 @@ export const SchedulerCard = forwardRef<HTMLDivElement, Props>(function Schedule
           </div>
         )}
       </div>
-      <div className="min-w-0 flex-1 pr-1">
+      <div
+        className="min-w-0 flex-1 pr-0.5"
+        onClick={onRequestEdit ? (e) => e.stopPropagation() : undefined}
+        onKeyDown={
+          onRequestEdit
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onRequestEdit();
+                }
+              }
+            : undefined
+        }
+        role={onRequestEdit ? "group" : undefined}
+      >
         {timeLabel ? (
           <p className="text-[10px] leading-tight text-gray-400 max-md:mb-0.5">
             <span className="font-medium tabular-nums text-gray-500">{timeLabel}</span>
             <span className="text-gray-300"> · </span>
-            <span className="text-gray-400">Optimized posting time</span>
+            <span className="text-gray-400">Slot time</span>
           </p>
         ) : (
-          <p className="text-[10px] text-gray-400">Optimized posting time</p>
+          <p className="text-[10px] text-gray-400">Slot time</p>
         )}
-        <p className="line-clamp-2 text-sm font-medium leading-snug text-gray-900 sm:mt-0 max-md:mt-1 max-md:text-[15px]">
+        <p className="line-clamp-2 text-sm font-medium leading-snug text-gray-900 sm:mt-0 max-md:mt-0.5 max-md:text-[15px]">
           {cell.title}
         </p>
         <p className="text-xs text-gray-600 sm:mt-0.5 max-md:mt-0.5 max-md:text-sm">
@@ -92,23 +104,25 @@ export const SchedulerCard = forwardRef<HTMLDivElement, Props>(function Schedule
         <p className="line-clamp-1 text-xs text-gray-500 sm:mt-0 max-md:mt-0.5">
           {cell.location || "—"}
         </p>
-        {onCaptionChange != null ? (
-          <label className="mt-1.5 block">
-            <span className="text-[9px] font-medium uppercase text-gray-400">
-              Caption
-            </span>
-            <textarea
-              className="mt-0.5 w-full resize-y min-h-12 rounded-md border border-gray-200 bg-gray-50/80 px-1.5 py-1 text-[12px] leading-snug text-gray-800 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-200"
-              value={cell.caption ?? ""}
-              onChange={(e) => onCaptionChange(e.target.value)}
-              onBlur={() => onCaptionCommit?.()}
-              rows={2}
-              onPointerDown={(e) => e.stopPropagation()}
-            />
-          </label>
+        {onRequestEdit ? (
+          <div className="mt-1.5">
+            <p className="line-clamp-2 text-left text-xs text-gray-500">
+              {cell.caption?.trim() ? cell.caption : "No caption yet — open to write."}
+            </p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRequestEdit();
+              }}
+              className="mt-0.5 text-xs font-medium text-gray-800 underline decoration-gray-300 underline-offset-2 hover:text-gray-950"
+            >
+              View / edit
+            </button>
+          </div>
         ) : null}
       </div>
-      <div className="shrink-0 self-start">
+      <div className="shrink-0 self-start pt-0.5">
         <Badge
           variant={statusVariant[cell.status] ?? "default"}
           className="!px-2 !py-0.5 !text-[10px] min-[480px]:!text-[10px]"

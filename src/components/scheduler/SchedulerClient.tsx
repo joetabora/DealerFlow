@@ -28,7 +28,6 @@ import { mapPostsToGrid } from "@/lib/schedule-mapper";
 import {
   buildApplyFlat,
   buildGenerateApplyFlat,
-  buildGenerateDayApplyFlat,
   hasDuplicateBikesOnSameDay,
   weekRange,
 } from "@/lib/schedule-apply";
@@ -38,6 +37,7 @@ import { buttonPrimary, buttonSecondary } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { SchedulerGridSkeleton } from "@/components/ui/skeleton";
 import { SchedulerCard } from "@/components/scheduler/SchedulerCard";
+import { SchedulerPostDialog } from "@/components/scheduler/scheduler-post-dialog";
 import { cn } from "@/lib/cn";
 import {
   applyWeek,
@@ -46,6 +46,7 @@ import {
   getSchedulerPosts,
   getSlotPlan,
   listBikesForSchedule,
+  updatePostCaption,
 } from "@/app/scheduler/actions";
 import { SHELL_MAX, SHELL_PX } from "@/components/app/shell-classnames";
 import { defaultHoursByDay } from "@/lib/post-timing";
@@ -131,7 +132,7 @@ function EmptySlot({
       )}
     >
       <span className="text-[10px] font-medium text-gray-400">{timeHint}</span>
-      <span className="text-xs text-gray-400">Open slot · drop a card</span>
+      <span className="text-xs text-gray-400">Open — drop a card by the slot grip</span>
     </div>
   );
 }
@@ -144,8 +145,7 @@ type FilledProps = {
   locFilter: LocationFilter;
   stFilter: StatusFilter;
   timeLabel: string;
-  onCaptionUpdate: (d: number, s: number, text: string) => void;
-  onCaptionCommit: () => void;
+  onRequestEdit: (d: number, s: number) => void;
 };
 
 function FilledSlot({
@@ -156,8 +156,7 @@ function FilledSlot({
   locFilter,
   stFilter,
   timeLabel,
-  onCaptionUpdate,
-  onCaptionCommit,
+  onRequestEdit,
 }: FilledProps) {
   const dropId = `drop-${d}-${s}`;
   const dragId = `drag-${d}-${s}`;
@@ -187,18 +186,31 @@ function FilledSlot({
       <div
         ref={setDrag}
         style={style}
-        {...attributes}
-        {...listeners}
-        className="touch-none"
+        className="flex w-full min-w-0 items-stretch gap-0.5"
       >
-        <SchedulerCard
-          cell={cell}
-          dimmed={dimmed}
-          timeLabel={timeLabel}
-          className="cursor-grab active:scale-[0.99] active:cursor-grabbing"
-          onCaptionChange={(t) => onCaptionUpdate(d, s, t)}
-          onCaptionCommit={onCaptionCommit}
-        />
+        <button
+          type="button"
+          className="flex w-7 shrink-0 flex-col items-center justify-center self-stretch rounded-lg border border-gray-200/80 bg-gray-50 text-gray-500 hover:bg-gray-100 sm:w-8"
+          aria-label="Drag to move to another time slot"
+          {...listeners}
+          {...attributes}
+        >
+          <span className="select-none text-sm leading-none" aria-hidden>
+            ⋮
+          </span>
+          <span className="select-none -mt-0.5 text-sm leading-none" aria-hidden>
+            ⋮
+          </span>
+        </button>
+        <div className="min-w-0 flex-1">
+          <SchedulerCard
+            cell={cell}
+            dimmed={dimmed}
+            timeLabel={timeLabel}
+            onRequestEdit={() => onRequestEdit(d, s)}
+            className="!border-0 !shadow-none"
+          />
+        </div>
       </div>
     </div>
   );
@@ -213,13 +225,11 @@ type SlotCellProps = {
   stFilter: StatusFilter;
   monday: Date;
   hoursByDay: number[][];
-  onCaptionUpdate: (d: number, s: number, text: string) => void;
-  onCaptionCommit: () => void;
+  onRequestEdit: (d: number, s: number) => void;
 };
 
 function SlotCell(props: SlotCellProps) {
-  const { d, s, overRing, locFilter, stFilter, monday, hoursByDay, onCaptionUpdate, onCaptionCommit } =
-    props;
+  const { d, s, overRing, locFilter, stFilter, monday, hoursByDay, onRequestEdit } = props;
   const timeHint = formatSlotTime(monday, d, s, hoursByDay);
   if (props.cell) {
     return (
@@ -231,8 +241,7 @@ function SlotCell(props: SlotCellProps) {
         locFilter={locFilter}
         stFilter={stFilter}
         timeLabel={timeHint}
-        onCaptionUpdate={onCaptionUpdate}
-        onCaptionCommit={onCaptionCommit}
+        onRequestEdit={onRequestEdit}
       />
     );
   }
@@ -255,7 +264,7 @@ export default function SchedulerClient() {
   const [hoursByDay, setHoursByDay] = useState<number[][]>(() => defaultHoursByDay());
   const [locFilter, setLocFilter] = useState<LocationFilter>("all");
   const [stFilter, setStFilter] = useState<StatusFilter>("all");
-  const [dayToGen, setDayToGen] = useState(0);
+  const [editSlot, setEditSlot] = useState<{ d: number; s: number } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeCell, setActiveCell] = useState<SchedulerCell | null>(null);
   const [overRing, setOverRing] = useState(false);
@@ -267,6 +276,8 @@ export default function SchedulerClient() {
     () => grid.length > 0 && grid.some((r) => r.some((c) => c != null)),
     [grid],
   );
+  const editDialogCell =
+    editSlot != null ? (grid[editSlot.d]?.[editSlot.s] ?? null) : null;
 
   const reload = useCallback(async () => {
     setLoadError(null);
@@ -342,21 +353,42 @@ export default function SchedulerClient() {
     [from, to, monday, hoursByDay, show, reload],
   );
 
-  const onCaptionUpdate = useCallback(
-    (d: number, s: number, text: string) => {
-      setGrid((g) => {
-        const n = g.map((row) => row.map((c) => c));
-        const cur = n[d]![s];
-        if (cur) n[d]![s] = { ...cur, caption: text };
-        return n;
-      });
-    },
-    [],
-  );
+  const onRequestPostEdit = useCallback((d: number, s: number) => {
+    setEditSlot({ d, s });
+  }, []);
 
-  const onCaptionCommit = useCallback(() => {
-    persist(gridRef.current);
-  }, [persist]);
+  const handleDialogSave = useCallback(
+    async (caption: string) => {
+      if (!editSlot) return;
+      const { d, s } = editSlot;
+      const cur = gridRef.current[d]?.[s];
+      if (!cur) return;
+      if (cur.postId) {
+        const r = await updatePostCaption(cur.postId, caption);
+        if (r.ok) {
+          show("Caption saved", "success");
+          setEditSlot(null);
+          await reload();
+        } else {
+          show(r.error, "error");
+        }
+        return;
+      }
+      const n = gridRef.current.map((row) => row.map((c) => c));
+      if (n[d]![s]) n[d]![s] = { ...n[d]![s]!, caption };
+      setGrid(n);
+      const r = await applyWeek(from, to, buildApplyFlat(monday, n, hoursByDay));
+      if (r.ok) {
+        show("Post saved", "success");
+        setEditSlot(null);
+        await reload();
+      } else {
+        show(r.error, "error");
+        await reload();
+      }
+    },
+    [editSlot, from, to, monday, hoursByDay, show, reload],
+  );
 
   const onDragStart = (e: DragStartEvent) => {
     setOverRing(true);
@@ -393,7 +425,7 @@ export default function SchedulerClient() {
   const onGenerate = useCallback(() => {
     startTransition(async () => {
       const [b, plan] = await Promise.all([
-        listBikesForSchedule(from, to, locFilter, { type: "replaceEntireWorkWeek" }),
+        listBikesForSchedule(from, to, locFilter),
         getSlotPlan(),
       ]);
       const h = plan.ok ? plan.hoursByDay : defaultHoursByDay();
@@ -415,7 +447,7 @@ export default function SchedulerClient() {
       );
       const r = await applyWeek(from, to, flat);
       if (r.ok) {
-        show("Week generated (14-day rule, media, balance). Edit captions and drag to adjust.", "success");
+        show("Week generated. Use the grip to drag; click the card to edit the caption.", "success");
         await reload();
       } else {
         show(r.error, "error");
@@ -423,46 +455,6 @@ export default function SchedulerClient() {
       }
     });
   }, [from, to, monday, locFilter, show, reload]);
-
-  const onGenerateDay = useCallback(() => {
-    startTransition(async () => {
-      const [b, plan] = await Promise.all([
-        listBikesForSchedule(from, to, locFilter, {
-          type: "replaceDayInWeek",
-          dayIndex: dayToGen,
-        }),
-        getSlotPlan(),
-      ]);
-      const h = plan.ok ? plan.hoursByDay : defaultHoursByDay();
-      if (plan.ok) setHoursByDay(plan.hoursByDay);
-      if (!b.ok) {
-        show(b.error, "error");
-        return;
-      }
-      if (b.bikes.length === 0) {
-        show("No in-stock units with media for this filter. Upload photos first.", "error");
-        return;
-      }
-      const g = gridRef.current;
-      const flat = buildGenerateDayApplyFlat(
-        monday,
-        dayToGen,
-        b.bikes,
-        h,
-        b.anchorPosts,
-        locFilter,
-        g,
-      );
-      const r = await applyWeek(from, to, flat);
-      if (r.ok) {
-        show("Day generated. Open captions below each card to edit.", "success");
-        await reload();
-      } else {
-        show(r.error, "error");
-        await reload();
-      }
-    });
-  }, [from, to, monday, locFilter, dayToGen, show, reload]);
 
   const onClear = useCallback(() => {
     startTransition(async () => {
@@ -547,34 +539,7 @@ export default function SchedulerClient() {
       <PageHeader
         title="Scheduler"
         action={
-            <div className="hidden flex-wrap items-center justify-end gap-2 md:flex">
-            <div className="flex flex-wrap items-end gap-1.5">
-              <div>
-                <span className="mb-0.5 block text-[10px] font-medium text-gray-500">
-                  Day
-                </span>
-                <select
-                  className="h-9 min-w-[4.5rem] rounded-lg border border-gray-300 bg-white px-2 text-sm"
-                  value={dayToGen}
-                  onChange={(e) => setDayToGen(+e.target.value)}
-                  disabled={isPending}
-                >
-                  {dayLabels.map((L, i) => (
-                    <option key={L} value={i}>
-                      {L}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={onGenerateDay}
-                className={buttonPrimary}
-                disabled={isPending}
-              >
-                {isPending ? "…" : "Generate day"}
-              </button>
-            </div>
+          <div className="hidden flex-wrap items-center justify-end gap-2 md:flex">
             <button
               type="button"
               onClick={onGenerate}
@@ -695,8 +660,7 @@ export default function SchedulerClient() {
                               stFilter={stFilter}
                               monday={monday}
                               hoursByDay={hoursByDay}
-                              onCaptionUpdate={onCaptionUpdate}
-                              onCaptionCommit={onCaptionCommit}
+                              onRequestEdit={onRequestPostEdit}
                             />
                           </div>
                         ))}
@@ -713,10 +677,13 @@ export default function SchedulerClient() {
             >
               {activeCell ? (
                 <div className="scale-[1.02] shadow-2xl transition-transform duration-200">
-                  <SchedulerCard
-                    cell={activeCell}
-                    className="cursor-grabbing"
-                  />
+                  <div className="flex gap-0.5">
+                    <div className="w-7 shrink-0 rounded-lg border border-gray-200/80 bg-gray-50" aria-hidden />
+                    <SchedulerCard
+                      cell={activeCell}
+                      className="!border-gray-200 cursor-grabbing"
+                    />
+                  </div>
                 </div>
               ) : null}
             </DragOverlay>
@@ -756,6 +723,20 @@ export default function SchedulerClient() {
           </div>
         </div>
       </div>
+      {editSlot && editDialogCell ? (
+        <SchedulerPostDialog
+          open
+          onClose={() => setEditSlot(null)}
+          cell={editDialogCell}
+          timeLabel={formatSlotTime(
+            monday,
+            editSlot.d,
+            editSlot.s,
+            hoursByDay,
+          )}
+          onSave={handleDialogSave}
+        />
+      ) : null}
     </>
   );
 }

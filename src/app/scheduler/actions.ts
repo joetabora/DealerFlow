@@ -11,7 +11,6 @@ import {
   getDealerTimeZone,
 } from "@/lib/post-timing";
 import { renderDefaultCaption } from "@/lib/caption-template";
-import { getMonday, localDayIndexInWeek } from "@/lib/week";
 import type { LocationFilter, SchedulerCell } from "@/types/scheduler";
 import type { AnchorPost } from "@/lib/scheduling-cooldown";
 
@@ -333,17 +332,12 @@ function mediaCount(b: BikeRow): number {
   return typeof m.count === "number" ? m.count : 0;
 }
 
-export type AnchorExclusion =
-  | { type: "replaceEntireWorkWeek" }
-  | { type: "replaceDayInWeek"; dayIndex: number };
-
+/** Anchor posts for cooldown when generating: exclude draft/scheduled in the work week (replaced on generate). */
 function toAnchorRows(
   rows: { bike_id: string; scheduled_date: string; status: string }[],
   weekFromIso: string,
   weekToIso: string,
-  ex: AnchorExclusion,
 ): AnchorPost[] {
-  const monday = getMonday(new Date(weekFromIso));
   const wf = new Date(weekFromIso).getTime();
   const wt = new Date(weekToIso).getTime();
   const out: AnchorPost[] = [];
@@ -352,18 +346,10 @@ function toAnchorRows(
       out.push({ bike_id: p.bike_id, scheduled_date: p.scheduled_date });
       continue;
     }
-    const t = new Date(p.scheduled_date);
-    const ti = t.getTime();
+    const ti = new Date(p.scheduled_date).getTime();
     if (ti < wf || ti >= wt) {
       out.push({ bike_id: p.bike_id, scheduled_date: p.scheduled_date });
       continue;
-    }
-    if (ex.type === "replaceEntireWorkWeek") {
-      continue;
-    }
-    const d = localDayIndexInWeek(monday, t);
-    if (d !== ex.dayIndex) {
-      out.push({ bike_id: p.bike_id, scheduled_date: p.scheduled_date });
     }
   }
   return out;
@@ -376,7 +362,6 @@ export async function listBikesForSchedule(
   weekFromIso: string,
   weekToIso: string,
   location: LocationFilter,
-  anchorExclusion: AnchorExclusion,
 ): Promise<ListBikesResult> {
   let supabase;
   try {
@@ -417,7 +402,6 @@ export async function listBikesForSchedule(
       (pRows ?? []) as { bike_id: string; scheduled_date: string; status: string }[],
       weekFromIso,
       weekToIso,
-      anchorExclusion,
     );
   }
 
