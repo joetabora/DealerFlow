@@ -2,6 +2,7 @@
 
 import { type CSSProperties, forwardRef } from "react";
 import { BrowserImage } from "@/components/media/browser-image";
+import { ExpandableMedia } from "@/components/media/media-lightbox";
 import { cn } from "@/lib/cn";
 import { Badge } from "@/components/ui/badge";
 import type { SchedulerCell } from "@/types/scheduler";
@@ -40,11 +41,18 @@ export const SchedulerCard = forwardRef<HTMLDivElement, Props>(function Schedule
     >
       <div className="group/image relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-gray-100 sm:h-16 sm:w-16">
         {cell.thumbUrl ? (
-          <BrowserImage
+          <ExpandableMedia
+            type="image"
             src={cell.thumbUrl}
-            alt=""
-            className="h-full w-full object-cover transition duration-200 will-change-transform group-hover/image:scale-105"
-          />
+            className="h-full w-full"
+            triggerClassName="h-full w-full"
+          >
+            <BrowserImage
+              src={cell.thumbUrl}
+              alt=""
+              className="h-full w-full object-cover transition duration-200 will-change-transform group-hover/image:scale-105"
+            />
+          </ExpandableMedia>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">
             No photo

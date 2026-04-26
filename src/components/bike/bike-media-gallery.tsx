@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteBikeMedia } from "@/app/bikes/[id]/actions";
 import { BrowserImage } from "@/components/media/browser-image";
+import { ExpandableMedia } from "@/components/media/media-lightbox";
 import { useToast } from "@/components/ui/toast";
 import type { BikeMedia } from "@/types/bike";
 
@@ -67,21 +68,30 @@ export function BikeMediaGallery({ bikeId, media }: Props) {
                         : "Failed")}
                   </p>
                 ) : null}
-                <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                  {m.type === "image" ? (
-                    <BrowserImage
-                      src={m.file_url}
-                      alt=""
-                      className="aspect-[4/3] w-full object-cover"
-                    />
-                  ) : (
-                    <video
-                      src={m.file_url}
-                      controls
-                      className="aspect-[4/3] w-full object-cover"
-                    />
-                  )}
-                  <div className="absolute right-2 top-2 z-10">
+                <div className="relative">
+                  <ExpandableMedia
+                    type={m.type === "image" ? "image" : "video"}
+                    src={m.file_url}
+                    className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+                    triggerClassName={
+                      m.type === "video" ? "aspect-[4/3] w-full" : undefined
+                    }
+                  >
+                    {m.type === "image" ? (
+                      <BrowserImage
+                        src={m.file_url}
+                        alt=""
+                        className="aspect-[4/3] w-full object-cover"
+                      />
+                    ) : (
+                      <video
+                        src={m.file_url}
+                        controls
+                        className="aspect-[4/3] w-full object-cover"
+                      />
+                    )}
+                  </ExpandableMedia>
+                  <div className="absolute right-2 top-2 z-20">
                     <button
                       type="button"
                       onClick={() => onDelete(m)}

@@ -6,6 +6,7 @@ import { repostBike } from "@/app/leaderboard/actions";
 import { buttonSecondary } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { BrowserImage } from "@/components/media/browser-image";
+import { ExpandableMedia } from "@/components/media/media-lightbox";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import type { LeaderboardRow } from "@/lib/leaderboard-data";
@@ -68,11 +69,18 @@ export function TopPerformingBikes({
               <div className="flex items-center gap-3 px-4 py-3 sm:gap-4 sm:px-5">
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-14 sm:w-14">
                   {row.thumbUrl ? (
-                    <BrowserImage
+                    <ExpandableMedia
+                      type="image"
                       src={row.thumbUrl}
-                      alt=""
-                      className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
-                    />
+                      className="h-full w-full"
+                      triggerClassName="h-full w-full"
+                    >
+                      <BrowserImage
+                        src={row.thumbUrl}
+                        alt=""
+                        className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
+                      />
+                    </ExpandableMedia>
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">
                       —
