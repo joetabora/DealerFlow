@@ -14,8 +14,14 @@ export type Bike = {
   created_at: string;
 };
 
+export type MediaProcessingStatus = "ready" | "processing" | "failed";
+
 export type BikeMedia = {
   id: string;
   file_url: string;
   type: "image" | "video";
+  status?: MediaProcessingStatus;
+  original_url?: string | null;
+  compressed_url?: string | null;
+  processing_error?: string | null;
 };

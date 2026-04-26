@@ -48,7 +48,7 @@ export default async function BikeDetailPage({ params }: Props) {
 
   const { data: mediaRows } = await supabase
     .from("media")
-    .select("id, file_url, type")
+    .select("id, file_url, type, status, original_url, compressed_url, processing_error")
     .eq("bike_id", id)
     .order("created_at", { ascending: true });
   const media = (mediaRows as BikeMedia[] | null) ?? [];
@@ -133,26 +133,50 @@ export default async function BikeDetailPage({ params }: Props) {
                 Media
               </h2>
               <ul className="mt-3 grid list-none gap-3 sm:grid-cols-2">
-                {media.map((m) => (
-                  <li key={m.id}>
-                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                      {m.type === "image" ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={m.file_url}
-                          alt=""
-                          className="aspect-[4/3] w-full object-cover"
-                        />
-                      ) : (
-                        <video
-                          src={m.file_url}
-                          controls
-                          className="aspect-[4/3] w-full object-cover"
-                        />
-                      )}
-                    </div>
-                  </li>
-                ))}
+                {media.map((m) => {
+                  const v = m.type === "video" ? m.status : undefined;
+                  return (
+                    <li key={m.id}>
+                      <div className="space-y-1.5">
+                        {m.type === "video" && v ? (
+                          <p
+                            className={
+                              "text-xs font-medium " +
+                              (v === "failed"
+                                ? "text-red-600"
+                                : v === "processing"
+                                  ? "text-amber-700"
+                                  : "text-emerald-600")
+                            }
+                          >
+                            {v === "processing" && "Processing video…"}
+                            {v === "ready" && "Ready"}
+                            {v === "failed" &&
+                              (m.processing_error
+                                ? `Failed: ${m.processing_error.slice(0, 100)}${(m.processing_error?.length ?? 0) > 100 ? "…" : ""}`
+                                : "Failed")}
+                          </p>
+                        ) : null}
+                        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                          {m.type === "image" ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={m.file_url}
+                              alt=""
+                              className="aspect-[4/3] w-full object-cover"
+                            />
+                          ) : (
+                            <video
+                              src={m.file_url}
+                              controls
+                              className="aspect-[4/3] w-full object-cover"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ) : null}

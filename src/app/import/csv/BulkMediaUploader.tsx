@@ -9,12 +9,25 @@ import {
   resolveStockForMedia,
   safeStorageFileName,
 } from "@/lib/inventory/matchFileToStock";
+import {
+  transcodeVideoInBrowser,
+  useClientFfmpegEnabled,
+} from "@/lib/video/client-transcode";
 
 type SkuId = { sku: string; id: string };
 
 type UploadStatus =
-  | { name: string; state: "ok" | "err"; detail?: string }
-  | { name: string; state: "skip"; detail: string };
+  | { name: string; state: "ok" | "err" | "skip"; detail?: string }
+  | {
+      name: string;
+      state: "video";
+      mediaId: string;
+      job: "processing" | "ready" | "failed";
+      detail?: string;
+    };
+
+const POLL_MS = 2000;
+const POLL_MAX = 90;
 
 export function BulkMediaUploader() {
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -22,6 +35,9 @@ export function BulkMediaUploader() {
   const [log, setLog] = useState<UploadStatus[] | null>(null);
   const [working, setWorking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [pendingVideoIds, setPendingVideoIds] = useState<string[]>([]);
+  const pollCount = useRef(0);
+  const useClientFfmpeg = useClientFfmpegEnabled();
 
   useEffect(() => {
     folderInputRef.current?.setAttribute("webkitdirectory", "");
@@ -51,6 +67,80 @@ export function BulkMediaUploader() {
     return () => clearTimeout(id);
   }, [load]);
 
+  // Poll server-side transcode job status
+  useEffect(() => {
+    if (pendingVideoIds.length === 0) {
+      pollCount.current = 0;
+      return;
+    }
+    if (pollCount.current >= POLL_MAX) {
+      setLog((L) => {
+        if (!L) return L;
+        return L.map((r) => {
+          if (r.state !== "video" || r.job !== "processing") return r;
+          if (pendingVideoIds.includes(r.mediaId)) {
+            return {
+              ...r,
+              job: "failed" as const,
+              detail: "Status timeout — refresh the page to check",
+            };
+          }
+          return r;
+        });
+      });
+      setPendingVideoIds([]);
+      return;
+    }
+
+    const t = setInterval(() => {
+      void (async () => {
+        const s = createClient();
+        const { data, error } = await s
+          .from("media")
+          .select("id, status, processing_error")
+          .in("id", pendingVideoIds);
+        if (error) return;
+        const rows = (data ?? []) as {
+          id: string;
+          status: string;
+          processing_error: string | null;
+        }[];
+        const done = new Set<string>();
+        setLog((L) => {
+          if (!L) return L;
+          return L.map((r) => {
+            if (r.state !== "video" || r.job !== "processing") return r;
+            const row = rows.find((x) => x.id === r.mediaId);
+            if (!row) return r;
+            if (row.status === "ready")
+              return { ...r, job: "ready" as const, detail: "Compressed" };
+            if (row.status === "failed")
+              return {
+                ...r,
+                job: "failed" as const,
+                detail: row.processing_error || "Error",
+              };
+            return r;
+          });
+        });
+        for (const row of rows) {
+          if (row.status === "ready" || row.status === "failed")
+            done.add(row.id);
+        }
+        if (done.size) {
+          setPendingVideoIds((ids) => {
+            const next = ids.filter((id) => !done.has(id));
+            if (next.length < ids.length) pollCount.current = 0;
+            return next;
+          });
+        }
+        pollCount.current += 1;
+      })();
+    }, POLL_MS);
+
+    return () => clearInterval(t);
+  }, [pendingVideoIds]);
+
   async function processMediaItems(
     items: { file: File; relPath: string }[],
   ) {
@@ -61,11 +151,16 @@ export function BulkMediaUploader() {
     }
     setLog([]);
     setErr(null);
+    setPendingVideoIds([]);
+    pollCount.current = 0;
     setWorking(true);
     const list = skus.map((s) => s.sku);
     const idBy = new Map(skus.map((r) => [r.sku, r.id] as const));
     const s = createClient();
     const results: UploadStatus[] = [];
+    const newPending: string[] = [];
+    const clientMode = useClientFfmpeg;
+
     try {
       for (const { file, relPath } of items) {
         const display = relPath;
@@ -85,6 +180,122 @@ export function BulkMediaUploader() {
         }
         const objectName = `${Date.now()}-${safeStorageFileName(file.name)}`;
         const path = `${encodeURIComponent(sku)}/${objectName}`;
+        const isVideo = isVideoFile(file);
+
+        if (isVideo && clientMode) {
+          try {
+            const blob = await transcodeVideoInBrowser(file);
+            const origStoragePath = `${encodeURIComponent(sku)}/o-${objectName}`;
+            const compStoragePath = `${encodeURIComponent(sku)}/c-${objectName}.mp4`;
+            const { error: upOrig } = await s.storage
+              .from("bike-media")
+              .upload(origStoragePath, file, {
+                upsert: true,
+                contentType: file.type || "video/mp4",
+              });
+            if (upOrig) {
+              results.push({
+                name: display,
+                state: "err",
+                detail: upOrig.message,
+              });
+              continue;
+            }
+            const { data: origPub } = s.storage
+              .from("bike-media")
+              .getPublicUrl(origStoragePath);
+            const { error: upC } = await s.storage
+              .from("bike-media")
+              .upload(compStoragePath, blob, {
+                upsert: true,
+                contentType: "video/mp4",
+              });
+            if (upC) {
+              results.push({
+                name: display,
+                state: "err",
+                detail: upC.message,
+              });
+              continue;
+            }
+            const { data: cPub } = s.storage
+              .from("bike-media")
+              .getPublicUrl(compStoragePath);
+            const { data: insRow, error: ins } = await s
+              .from("media")
+              .insert({
+                bike_id: bikeId,
+                file_url: cPub.publicUrl,
+                type: "video",
+                status: "ready",
+                original_url: origPub.publicUrl,
+                compressed_url: cPub.publicUrl,
+              })
+              .select("id")
+              .single();
+            if (ins) {
+              results.push({ name: display, state: "err", detail: ins.message });
+              continue;
+            }
+            results.push({
+              name: display,
+              state: "video",
+              mediaId: insRow!.id,
+              job: "ready",
+              detail: "Client compressed (720p)",
+            });
+            continue;
+          } catch (e) {
+            console.warn("Client transcode failed, using server", e);
+            /* fall through to server upload + async transcode */
+          }
+        }
+
+        if (isVideo) {
+          const { error: up } = await s.storage
+            .from("bike-media")
+            .upload(path, file, {
+              upsert: true,
+              contentType: file.type || undefined,
+            });
+          if (up) {
+            results.push({ name: display, state: "err", detail: up.message });
+            continue;
+          }
+          const { data: pub } = s.storage.from("bike-media").getPublicUrl(path);
+          const publicUrl = pub.publicUrl;
+          const { data: insData, error: ins } = await s
+            .from("media")
+            .insert({
+              bike_id: bikeId,
+              file_url: publicUrl,
+              type: "video",
+              status: "processing",
+              original_url: publicUrl,
+            })
+            .select("id")
+            .single();
+          if (ins) {
+            results.push({ name: display, state: "err", detail: ins.message });
+            continue;
+          }
+          const mediaId = insData!.id;
+          newPending.push(mediaId);
+          results.push({
+            name: display,
+            state: "video",
+            mediaId,
+            job: "processing",
+            detail: "Uploading — compressing in background",
+          });
+          void fetch("/api/media/process-video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mediaId }),
+          });
+          continue;
+        }
+
         const { error: up } = await s.storage
           .from("bike-media")
           .upload(path, file, {
@@ -97,11 +308,12 @@ export function BulkMediaUploader() {
         }
         const { data: pub } = s.storage.from("bike-media").getPublicUrl(path);
         const publicUrl = pub.publicUrl;
-        const mtype = isVideoFile(file) ? "video" : "image";
         const { error: ins } = await s.from("media").insert({
           bike_id: bikeId,
           file_url: publicUrl,
-          type: mtype,
+          type: "image",
+          status: "ready",
+          original_url: publicUrl,
         });
         if (ins) {
           results.push({ name: display, state: "err", detail: ins.message });
@@ -110,6 +322,10 @@ export function BulkMediaUploader() {
         results.push({ name: display, state: "ok" });
       }
       setLog(results);
+      if (newPending.length) {
+        setPendingVideoIds((p) => [...p, ...newPending]);
+        pollCount.current = 0;
+      }
     } finally {
       setWorking(false);
     }
@@ -168,23 +384,26 @@ export function BulkMediaUploader() {
           the path is flat.
         </p>
         <p className="mt-2 text-center text-xs text-gray-500">
-          Chrome or Edge work best for folder drops.
+          Chrome or Edge work best for folder drops.{" "}
+          {useClientFfmpeg
+            ? "Client-side video compression is on (set in env)."
+            : "Large videos: originals upload first, then server compresses to 720p in the background (requires FFmpeg on the host)."}
         </p>
       </div>
       <div className="flex flex-wrap items-end gap-2.5">
         <div>
-            <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">
-              Files
-            </label>
-            <input
-              type="file"
-              multiple
-              accept="image/*,video/*"
-              disabled={working}
-              onChange={(e) => void onFiles(e.target.files)}
-              className="mt-0.5 block w-full min-w-0 text-sm"
-            />
-          </div>
+          <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">
+            Files
+          </label>
+          <input
+            type="file"
+            multiple
+            accept="image/*,video/*"
+            disabled={working}
+            onChange={(e) => void onFiles(e.target.files)}
+            className="mt-0.5 block w-full min-w-0 text-sm"
+          />
+        </div>
         <div>
           <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">
             Or folder
@@ -212,9 +431,7 @@ export function BulkMediaUploader() {
           Loaded {skus.length} stock number(s) from the database.
         </p>
       )}
-      {err && (
-        <p className="text-sm text-red-700">{err}</p>
-      )}
+      {err && <p className="text-sm text-red-700">{err}</p>}
       {working && <p className="text-sm">Uploading…</p>}
       {log && log.length > 0 && (
         <ul className="max-h-60 overflow-y-auto rounded-2xl border border-gray-200 text-xs">
@@ -231,6 +448,21 @@ export function BulkMediaUploader() {
               )}{" "}
               {l.state === "skip" && (
                 <span className="text-amber-600">skip</span>
+              )}{" "}
+              {l.state === "video" && (
+                <span
+                  className={
+                    l.job === "ready"
+                      ? "text-emerald-600"
+                      : l.job === "failed"
+                        ? "text-red-600"
+                        : "text-amber-600"
+                  }
+                >
+                  {l.job === "processing" && "video (processing…)"}
+                  {l.job === "ready" && "video (ready)"}
+                  {l.job === "failed" && "video (failed)"}
+                </span>
               )}{" "}
               {l.name}
               {l.detail ? ` — ${l.detail}` : ""}
