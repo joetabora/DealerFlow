@@ -72,23 +72,25 @@ export function BikeMediaGallery({ bikeId, media }: Props) {
                   <ExpandableMedia
                     type={m.type === "image" ? "image" : "video"}
                     src={m.file_url}
-                    className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
-                    triggerClassName={
-                      m.type === "video" ? "aspect-[4/3] w-full" : undefined
-                    }
+                    className="overflow-hidden rounded-2xl border border-gray-200 bg-zinc-100 shadow-sm"
+                    triggerClassName="w-full"
                   >
                     {m.type === "image" ? (
-                      <BrowserImage
-                        src={m.file_url}
-                        alt=""
-                        className="aspect-[4/3] w-full object-cover"
-                      />
+                      <div className="grid min-h-0 min-w-0 aspect-[4/3] w-full place-items-center bg-zinc-100">
+                        <BrowserImage
+                          src={m.file_url}
+                          alt=""
+                          className="max-h-full max-w-full object-contain [image-orientation:from-image]"
+                        />
+                      </div>
                     ) : (
-                      <video
-                        src={m.file_url}
-                        controls
-                        className="aspect-[4/3] w-full object-cover"
-                      />
+                      <div className="grid min-h-0 min-w-0 aspect-[4/3] w-full place-items-center bg-zinc-100">
+                        <video
+                          src={m.file_url}
+                          controls
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      </div>
                     )}
                   </ExpandableMedia>
                   <div className="absolute right-2 top-2 z-20">

@@ -34,13 +34,15 @@ export function InventoryBikeCard({ bike }: Props) {
             className="h-full w-full"
             triggerClassName="h-full w-full"
           >
-            <video
-              src={bike.heroUrl}
-              className="h-full w-full object-cover transition duration-200 group-hover/card:scale-105"
-              muted
-              playsInline
-              preload="metadata"
-            />
+            <div className="grid h-full w-full min-h-0 place-items-center bg-zinc-100">
+              <video
+                src={bike.heroUrl}
+                className="max-h-full max-w-full object-contain transition duration-200 group-hover/card:scale-105"
+                muted
+                playsInline
+                preload="metadata"
+              />
+            </div>
           </ExpandableMedia>
         ) : bike.heroUrl ? (
           <ExpandableMedia
@@ -49,11 +51,13 @@ export function InventoryBikeCard({ bike }: Props) {
             className="h-full w-full"
             triggerClassName="h-full w-full"
           >
-            <BrowserImage
-              src={bike.heroUrl}
-              alt=""
-              className="h-full w-full object-cover transition duration-200 group-hover/card:scale-105"
-            />
+            <div className="grid h-full w-full min-h-0 min-w-0 place-items-center bg-zinc-100">
+              <BrowserImage
+                src={bike.heroUrl}
+                alt=""
+                className="max-h-full max-w-full object-contain transition duration-200 group-hover/card:scale-105"
+              />
+            </div>
           </ExpandableMedia>
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">

@@ -75,11 +75,13 @@ export function TopPerformingBikes({
                       className="h-full w-full"
                       triggerClassName="h-full w-full"
                     >
-                      <BrowserImage
-                        src={row.thumbUrl}
-                        alt=""
-                        className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
-                      />
+                      <div className="grid h-full w-full min-h-0 min-w-0 place-items-center">
+                        <BrowserImage
+                          src={row.thumbUrl}
+                          alt=""
+                          className="max-h-full max-w-full object-contain transition duration-200 group-hover:scale-105"
+                        />
+                      </div>
                     </ExpandableMedia>
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">
