@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { heicUrlToJpegObjectUrl, urlLooksHeic } from "@/lib/media/heic";
+import { heicDisplaySupportsNativeImage } from "@/lib/media/heic-native";
 
 type Props = {
   src: string;
@@ -11,15 +12,26 @@ type Props = {
 } & React.ImgHTMLAttributes<HTMLImageElement>;
 
 /**
- * Renders HEIC/HEIF from a URL (e.g. Supabase) as JPEG in memory — most
- * browsers can’t display HEIC in &lt;img&gt; natively.
+ * HEIC/HEIF: WebKit (iOS, Safari) often decodes in &lt;img&gt; natively; others use
+ * heic2any. Cross-origin Supabase fetches go through a same-origin API route when
+ * standard CORS + fetch is unreliable.
  */
 export function BrowserImage({ src, alt = "", className, ...rest }: Props) {
   const objectRef = useRef<string | null>(null);
+  const [ready, setReady] = useState(false);
   const [displaySrc, setDisplaySrc] = useState<string | null>(() =>
     src && !urlLooksHeic(src) ? src : null,
   );
   const [failed, setFailed] = useState(false);
+  const [nativeHeicFailed, setNativeHeicFailed] = useState(false);
+
+  useEffect(() => {
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    setNativeHeicFailed(false);
+  }, [src]);
 
   useEffect(() => {
     function clearBlob() {
@@ -37,6 +49,13 @@ export function BrowserImage({ src, alt = "", className, ...rest }: Props) {
     if (!urlLooksHeic(src)) {
       clearBlob();
       setDisplaySrc(src);
+      setFailed(false);
+      return;
+    }
+
+    if (heicDisplaySupportsNativeImage() && !nativeHeicFailed) {
+      clearBlob();
+      setDisplaySrc(null);
       setFailed(false);
       return;
     }
@@ -64,18 +83,48 @@ export function BrowserImage({ src, alt = "", className, ...rest }: Props) {
       cancelled = true;
       clearBlob();
     };
-  }, [src]);
+  }, [src, nativeHeicFailed]);
+
+  const useNativeHeic =
+    ready &&
+    src &&
+    urlLooksHeic(src) &&
+    heicDisplaySupportsNativeImage() &&
+    !nativeHeicFailed;
 
   if (failed) {
     return (
       <div
         className={cn(
-          "flex h-full w-full items-center justify-center bg-gray-100 text-[10px] text-gray-500",
+          "flex h-full w-full flex-col items-center justify-center gap-1 bg-gray-100 px-2 text-center text-[10px] text-gray-500",
           className,
         )}
       >
-        Can’t show HEIC
+        <span>Could not decode HEIC in this browser.</span>
+        {src ? (
+          <a
+            href={src}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-gray-700 underline decoration-gray-300 underline-offset-2"
+          >
+            Open original
+          </a>
+        ) : null}
       </div>
+    );
+  }
+
+  if (useNativeHeic) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        onError={() => setNativeHeicFailed(true)}
+        {...rest}
+      />
     );
   }
 
