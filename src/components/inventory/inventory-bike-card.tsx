@@ -34,14 +34,16 @@ export function InventoryBikeCard({ bike }: Props) {
             className="h-full w-full"
             triggerClassName="h-full w-full"
           >
-            <div className="grid h-full w-full min-h-0 place-items-center bg-zinc-100">
-              <video
-                src={bike.heroUrl}
-                className="max-h-full max-w-full object-contain transition duration-200 group-hover/card:scale-105"
-                muted
-                playsInline
-                preload="metadata"
-              />
+            <div className="relative h-full w-full min-h-0 min-w-0 overflow-hidden bg-zinc-100">
+              <div className="absolute inset-0 box-border flex min-h-0 min-w-0 items-center justify-center p-0.5">
+                <video
+                  src={bike.heroUrl}
+                  className="h-auto max-h-full w-auto max-w-full object-contain transition duration-200 group-hover/card:scale-105"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+              </div>
             </div>
           </ExpandableMedia>
         ) : bike.heroUrl ? (
@@ -51,12 +53,14 @@ export function InventoryBikeCard({ bike }: Props) {
             className="h-full w-full"
             triggerClassName="h-full w-full"
           >
-            <div className="grid h-full w-full min-h-0 min-w-0 place-items-center bg-zinc-100">
-              <BrowserImage
-                src={bike.heroUrl}
-                alt=""
-                className="max-h-full max-w-full object-contain transition duration-200 group-hover/card:scale-105"
-              />
+            <div className="relative h-full w-full min-h-0 min-w-0 overflow-hidden bg-zinc-100">
+              <div className="absolute inset-0 box-border flex min-h-0 min-w-0 items-center justify-center p-0.5">
+                <BrowserImage
+                  src={bike.heroUrl}
+                  alt=""
+                  className="h-auto max-h-full w-auto max-w-full object-contain transition duration-200 group-hover/card:scale-105"
+                />
+              </div>
             </div>
           </ExpandableMedia>
         ) : (

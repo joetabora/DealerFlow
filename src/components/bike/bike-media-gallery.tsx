@@ -76,20 +76,24 @@ export function BikeMediaGallery({ bikeId, media }: Props) {
                     triggerClassName="w-full"
                   >
                     {m.type === "image" ? (
-                      <div className="grid min-h-0 min-w-0 aspect-[4/3] w-full place-items-center bg-zinc-100">
-                        <BrowserImage
-                          src={m.file_url}
-                          alt=""
-                          className="max-h-full max-w-full object-contain [image-orientation:from-image]"
-                        />
+                      <div className="relative aspect-[4/3] w-full min-h-0 min-w-0 overflow-hidden bg-zinc-100">
+                        <div className="absolute inset-0 box-border flex min-h-0 min-w-0 items-center justify-center p-0.5">
+                          <BrowserImage
+                            src={m.file_url}
+                            alt=""
+                            className="h-auto max-h-full w-auto max-w-full object-contain [image-orientation:from-image]"
+                          />
+                        </div>
                       </div>
                     ) : (
-                      <div className="grid min-h-0 min-w-0 aspect-[4/3] w-full place-items-center bg-zinc-100">
-                        <video
-                          src={m.file_url}
-                          controls
-                          className="max-h-full max-w-full object-contain"
-                        />
+                      <div className="relative aspect-[4/3] w-full min-h-0 min-w-0 overflow-hidden bg-zinc-100">
+                        <div className="absolute inset-0 box-border flex min-h-0 min-w-0 items-center justify-center p-0.5">
+                          <video
+                            src={m.file_url}
+                            controls
+                            className="h-auto max-h-full w-auto max-w-full object-contain"
+                          />
+                        </div>
                       </div>
                     )}
                   </ExpandableMedia>

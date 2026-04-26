@@ -70,21 +70,26 @@ function MediaLightboxView({
             Close
           </button>
         </div>
-        <div className="flex min-h-0 w-full min-w-0 max-w-[min(100vw-1.5rem,1200px)] items-center justify-center rounded-lg bg-zinc-900/40 p-1 shadow-2xl">
-          {type === "image" ? (
-            <BrowserImage
-              src={src}
-              alt={alt}
-              className="h-auto w-auto max-h-[min(85dvh,900px)] max-w-full object-contain [image-orientation:from-image]"
-            />
-          ) : (
-            <video
-              src={src}
-              controls
-              playsInline
-              className="h-auto w-auto max-h-[min(85dvh,900px)] max-w-full"
-            />
-          )}
+        <div
+          className="relative w-full min-w-0 max-w-[min(100vw-1.5rem,1200px)] overflow-hidden rounded-lg bg-zinc-900/40 shadow-2xl"
+          style={{ height: "min(85dvh, 900px)" }}
+        >
+          <div className="absolute inset-0 box-border flex min-h-0 min-w-0 items-center justify-center p-1">
+            {type === "image" ? (
+              <BrowserImage
+                src={src}
+                alt={alt}
+                className="h-auto max-h-full w-auto max-w-full object-contain [image-orientation:from-image]"
+              />
+            ) : (
+              <video
+                src={src}
+                controls
+                playsInline
+                className="h-auto max-h-full w-auto max-w-full"
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>,
