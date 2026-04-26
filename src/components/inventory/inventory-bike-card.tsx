@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { InventoryBike } from "@/lib/inventory-list";
+import { BrowserImage } from "@/components/media/browser-image";
 import { Badge } from "@/components/ui/badge";
 import { CardShell } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
@@ -33,8 +34,7 @@ export function InventoryBikeCard({ bike }: Props) {
               preload="metadata"
             />
           ) : bike.heroUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <BrowserImage
               src={bike.heroUrl}
               alt=""
               className="h-full w-full object-cover transition duration-200 group-hover:scale-105"

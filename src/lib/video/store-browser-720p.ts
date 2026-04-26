@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { transcodeVideoInBrowser } from "@/lib/video/client-transcode";
+import { insertMediaRow } from "@/lib/media/insert-media";
 import { SUPABASE_STORAGE_SIZE_HINT } from "@/lib/video/upload-policy";
 
 export type StoreBrowser720pResult =
@@ -47,20 +48,16 @@ export async function store720pFromBrowser(
     return { ok: false, error: upC.message };
   }
   const { data: cPub } = s.storage.from("bike-media").getPublicUrl(compPath);
-  const { data: insRow, error: ins } = await s
-    .from("media")
-    .insert({
-      bike_id: opts.bikeId,
-      file_url: cPub.publicUrl,
-      type: "video",
-      status: "ready",
-      original_url: null,
-      compressed_url: cPub.publicUrl,
-    })
-    .select("id")
-    .single();
-  if (ins) {
-    return { ok: false, error: ins.message };
+  const insR = await insertMediaRow(s, {
+    bike_id: opts.bikeId,
+    file_url: cPub.publicUrl,
+    type: "video",
+    status: "ready",
+    original_url: null,
+    compressed_url: cPub.publicUrl,
+  });
+  if (!insR.ok) {
+    return { ok: false, error: insR.message };
   }
-  return { ok: true, mediaId: (insRow as { id: string }).id, publicUrl: cPub.publicUrl };
+  return { ok: true, mediaId: insR.id, publicUrl: cPub.publicUrl };
 }

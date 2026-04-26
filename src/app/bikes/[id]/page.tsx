@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/app/app-layout";
 import { PageHeader } from "@/components/app/page-header";
 import { buttonSecondary } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BikeMediaGallery } from "@/components/bike/bike-media-gallery";
 import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import type { Bike, BikeMedia } from "@/types/bike";
@@ -127,59 +128,7 @@ export default async function BikeDetailPage({ params }: Props) {
             </dl>
           </Card>
 
-          {media.length > 0 ? (
-            <div>
-              <h2 className="text-lg font-medium leading-tight text-gray-800">
-                Media
-              </h2>
-              <ul className="mt-3 grid list-none gap-3 sm:grid-cols-2">
-                {media.map((m) => {
-                  const v = m.type === "video" ? m.status : undefined;
-                  return (
-                    <li key={m.id}>
-                      <div className="space-y-1.5">
-                        {m.type === "video" && v ? (
-                          <p
-                            className={
-                              "text-xs font-medium " +
-                              (v === "failed"
-                                ? "text-red-600"
-                                : v === "processing"
-                                  ? "text-amber-700"
-                                  : "text-emerald-600")
-                            }
-                          >
-                            {v === "processing" && "Processing video…"}
-                            {v === "ready" && "Ready"}
-                            {v === "failed" &&
-                              (m.processing_error
-                                ? `Failed: ${m.processing_error.slice(0, 100)}${(m.processing_error?.length ?? 0) > 100 ? "…" : ""}`
-                                : "Failed")}
-                          </p>
-                        ) : null}
-                        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                          {m.type === "image" ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={m.file_url}
-                              alt=""
-                              className="aspect-[4/3] w-full object-cover"
-                            />
-                          ) : (
-                            <video
-                              src={m.file_url}
-                              controls
-                              className="aspect-[4/3] w-full object-cover"
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : null}
+          <BikeMediaGallery bikeId={id} media={media} />
         </div>
       </AppLayout>
     </>

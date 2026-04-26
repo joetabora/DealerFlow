@@ -5,6 +5,7 @@ import Link from "next/link";
 import { repostBike } from "@/app/leaderboard/actions";
 import { buttonSecondary } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { BrowserImage } from "@/components/media/browser-image";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import type { LeaderboardRow } from "@/lib/leaderboard-data";
@@ -67,8 +68,7 @@ export function TopPerformingBikes({
               <div className="flex items-center gap-3 px-4 py-3 sm:gap-4 sm:px-5">
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-14 sm:w-14">
                   {row.thumbUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <BrowserImage
                       src={row.thumbUrl}
                       alt=""
                       className="h-full w-full object-cover transition duration-200 group-hover:scale-105"

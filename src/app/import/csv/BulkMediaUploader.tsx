@@ -13,10 +13,12 @@ import {
   transcodeVideoInBrowser,
   useClientFfmpegEnabled,
 } from "@/lib/video/client-transcode";
+import { isHeicFile, heicToJpegBlob } from "@/lib/media/heic";
 import { store720pFromBrowser } from "@/lib/video/store-browser-720p";
 import {
   getMaxDirectVideoUploadBytes,
 } from "@/lib/video/upload-policy";
+import { insertMediaRow } from "@/lib/media/insert-media";
 
 type SkuId = { sku: string; id: string };
 
@@ -260,28 +262,26 @@ export function BulkMediaUploader() {
             const { data: cPub } = s.storage
               .from("bike-media")
               .getPublicUrl(compStoragePath);
-            const { data: insRow, error: ins } = await s
-              .from("media")
-              .insert({
-                bike_id: bikeId,
-                file_url: cPub.publicUrl,
-                type: "video",
-                status: "ready",
-                original_url: origPub.publicUrl,
-                compressed_url: cPub.publicUrl,
-              })
-              .select("id")
-              .single();
-            if (ins) {
-              results.push({ name: display, state: "err", detail: ins.message });
+            const insR = await insertMediaRow(s, {
+              bike_id: bikeId,
+              file_url: cPub.publicUrl,
+              type: "video",
+              status: "ready",
+              original_url: origPub.publicUrl,
+              compressed_url: cPub.publicUrl,
+            });
+            if (!insR.ok) {
+              results.push({ name: display, state: "err", detail: insR.message });
               continue;
             }
             results.push({
               name: display,
               state: "video",
-              mediaId: insRow!.id,
+              mediaId: insR.id,
               job: "ready",
-              detail: "Client compressed (720p)",
+              detail: insR.wasDuplicate
+                ? "Already in library (same file URL)"
+                : "Client compressed (720p)",
             });
             continue;
           } catch (e) {
@@ -326,62 +326,102 @@ export function BulkMediaUploader() {
           }
           const { data: pub } = s.storage.from("bike-media").getPublicUrl(path);
           const publicUrl = pub.publicUrl;
-          const { data: insData, error: ins } = await s
-            .from("media")
-            .insert({
-              bike_id: bikeId,
-              file_url: publicUrl,
-              type: "video",
-              status: "processing",
-              original_url: publicUrl,
-            })
-            .select("id")
-            .single();
-          if (ins) {
-            results.push({ name: display, state: "err", detail: ins.message });
+          const insR = await insertMediaRow(s, {
+            bike_id: bikeId,
+            file_url: publicUrl,
+            type: "video",
+            status: "processing",
+            original_url: publicUrl,
+          });
+          if (!insR.ok) {
+            results.push({ name: display, state: "err", detail: insR.message });
             continue;
           }
-          const mediaId = insData!.id;
-          newPending.push(mediaId);
+          const mediaId = insR.id;
+          if (insR.status === "processing") {
+            newPending.push(mediaId);
+          }
+          const videoJob =
+            insR.status === "failed"
+              ? ("failed" as const)
+              : insR.status === "ready"
+                ? ("ready" as const)
+                : ("processing" as const);
           results.push({
             name: display,
             state: "video",
             mediaId,
-            job: "processing",
-            detail: "Uploading — compressing in background",
+            job: videoJob,
+            detail: insR.wasDuplicate
+              ? "Already in library — same file URL"
+              : insR.status === "ready"
+                ? "Transcode already finished"
+                : insR.status === "failed"
+                  ? "Previous transcode failed — refresh the bike page"
+                  : "Uploading — compressing in background",
           });
-          void fetch("/api/media/process-video", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mediaId }),
-          });
+          if (!insR.wasDuplicate && insR.status === "processing") {
+            void fetch("/api/media/process-video", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ mediaId }),
+            });
+          }
           continue;
         }
 
+        let imageUploadPath = path;
+        let imageBody: File | Blob = file;
+        let imageContentType = file.type || "application/octet-stream";
+        if (isHeicFile(file)) {
+          try {
+            const jpeg = await heicToJpegBlob(file);
+            imageBody = jpeg;
+            imageContentType = "image/jpeg";
+            imageUploadPath = path.replace(/\.(hei[cf])$/i, ".jpg");
+            if (imageUploadPath === path) {
+              imageUploadPath = `${path}.jpg`;
+            }
+          } catch (he) {
+            const msg = he instanceof Error ? he.message : "HEIC conversion failed";
+            results.push({
+              name: display,
+              state: "err",
+              detail: msg,
+            });
+            continue;
+          }
+        }
         const { error: up } = await s.storage
           .from("bike-media")
-          .upload(path, file, {
+          .upload(imageUploadPath, imageBody, {
             upsert: true,
-            contentType: file.type || undefined,
+            contentType: imageContentType,
           });
         if (up) {
           results.push({ name: display, state: "err", detail: up.message });
           continue;
         }
-        const { data: pub } = s.storage.from("bike-media").getPublicUrl(path);
+        const { data: pub } = s.storage
+          .from("bike-media")
+          .getPublicUrl(imageUploadPath);
         const publicUrl = pub.publicUrl;
-        const { error: ins } = await s.from("media").insert({
+        const insR = await insertMediaRow(s, {
           bike_id: bikeId,
           file_url: publicUrl,
           type: "image",
           status: "ready",
           original_url: publicUrl,
         });
-        if (ins) {
-          results.push({ name: display, state: "err", detail: ins.message });
+        if (!insR.ok) {
+          results.push({ name: display, state: "err", detail: insR.message });
           continue;
         }
-        results.push({ name: display, state: "ok" });
+        results.push({
+          name: display,
+          state: "ok",
+          detail: insR.wasDuplicate ? "Already in library (same file URL)" : undefined,
+        });
       }
       setLog(results);
       if (newPending.length) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, forwardRef } from "react";
+import { BrowserImage } from "@/components/media/browser-image";
 import { cn } from "@/lib/cn";
 import { Badge } from "@/components/ui/badge";
 import type { SchedulerCell } from "@/types/scheduler";
@@ -39,8 +40,7 @@ export const SchedulerCard = forwardRef<HTMLDivElement, Props>(function Schedule
     >
       <div className="group/image relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-gray-100 sm:h-16 sm:w-16">
         {cell.thumbUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <BrowserImage
             src={cell.thumbUrl}
             alt=""
             className="h-full w-full object-cover transition duration-200 will-change-transform group-hover/image:scale-105"
