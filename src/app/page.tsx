@@ -5,6 +5,8 @@ import { buttonPrimary, buttonSecondary } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getDashboardData } from "@/lib/dashboard-data";
+import { getTopPerformingPosts } from "@/lib/leaderboard-data";
+import { TopPerformingBikes } from "@/components/leaderboard/top-performing-bikes";
 
 function postStatusVariant(
   s: string,
@@ -22,7 +24,10 @@ function formatPostStatus(s: string) {
 }
 
 export default async function Home() {
-  const data = await getDashboardData();
+  const [data, topPerforming] = await Promise.all([
+    getDashboardData(),
+    getTopPerformingPosts(8),
+  ]);
 
   return (
     <>
@@ -79,6 +84,11 @@ export default async function Home() {
             <p className="mt-0.5 text-xs text-gray-500">Available, no photos/video</p>
           </Card>
         </div>
+
+        <TopPerformingBikes
+          rows={topPerforming.rows}
+          error={topPerforming.error}
+        />
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <Card>
