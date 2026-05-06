@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { BrowserImage } from "@/components/media/browser-image";
 import { cn } from "@/lib/cn";
@@ -26,7 +27,12 @@ function MediaLightboxView({
   const titleId = useId();
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      if (typeof document !== "undefined") {
+        document.body.style.removeProperty("overflow");
+      }
+      return;
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -118,6 +124,16 @@ export function ExpandableMedia({
   children,
 }: ExpandableProps) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const skipPathClose = useRef(true);
+
+  useEffect(() => {
+    if (skipPathClose.current) {
+      skipPathClose.current = false;
+      return;
+    }
+    setOpen(false);
+  }, [pathname]);
 
   if (type === "image") {
     return (

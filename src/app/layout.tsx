@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { NavigationBodyUnlock } from "@/components/app/navigation-body-unlock";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
@@ -29,7 +30,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-gray-50 text-gray-900">
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <NavigationBodyUnlock />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );
