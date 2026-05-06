@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/app/app-layout";
 import { PageHeader } from "@/components/app/page-header";
 import { buttonSecondary } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { InventorySyncClient } from "@/app/import/csv/InventorySyncClient";
+import { InventorySyncClient } from "@/app/(dashboard)/import/csv/InventorySyncClient";
 
 export default function MediaPage() {
   return (

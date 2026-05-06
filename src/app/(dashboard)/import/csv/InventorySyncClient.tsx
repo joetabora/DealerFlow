@@ -23,7 +23,7 @@ export function InventorySyncClient() {
       if (r.ok) {
         setMediaKey((k) => k + 1);
         show(
-          `Inventory updated: ${r.imported} in stock, ${r.removed} removed from catalog.`,
+          `Inventory synced: ${r.imported} in stock; ${r.markedSold} not in file → marked sold.`,
           "success",
         );
       } else {
@@ -43,10 +43,10 @@ export function InventorySyncClient() {
           <strong>Stock Number</strong>, <strong>Model</strong>, <strong>Year</strong>,{" "}
           <strong>Price</strong>, <strong>Mileage</strong>, and optional{" "}
           <strong>Location</strong> / <strong>Status</strong> are supported.{" "}
-          <strong>Stock Number</strong> is the internal <code>sku</code>. Each import{" "}
-          <strong>replaces the catalog</strong>: any bike not listed in the file is
-          removed (e.g. sold). URL scrapes or manual rows with skus that never appear
-          in a later CSV are removed too.{" "}
+          <strong>Stock Number</strong> is the internal <code>sku</code>. Each sync{" "}
+          <strong>upserts in-stock rows</strong> from the CSV. Units already in DealerFlow whose
+          SKUs are absent from this file&apos;s <em>available</em> list are marked{" "}
+          <strong>sold</strong> (not deleted), so schedules and media keep working for history.
         </p>
         <p className="mt-1.5 text-sm leading-relaxed text-gray-600">
           <strong>Media:</strong> use a folder per stock, named exactly like the

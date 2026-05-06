@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { repostBike } from "@/app/leaderboard/actions";
-import { updatePostEngagement } from "@/app/scheduler/actions";
+import { repostBike } from "@/app/(dashboard)/leaderboard/actions";
+import { updatePostEngagement } from "@/app/(dashboard)/scheduler/actions";
 import { buttonSecondary } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { BrowserImage } from "@/components/media/browser-image";
@@ -24,11 +24,6 @@ function EngagementFields({
   const [likes, setLikes] = useState(row.likes);
   const [comments, setComments] = useState(row.comments);
   const [pending, start] = useTransition();
-
-  useEffect(() => {
-    setLikes(row.likes);
-    setComments(row.comments);
-  }, [row.likes, row.comments, row.postId]);
 
   function save() {
     start(async () => {
@@ -189,7 +184,11 @@ export function TopPerformingBikes({
                         {row.engagementScore}
                       </span>
                     </p>
-                    <EngagementFields row={row} onSaved={() => router.refresh()} />
+                    <EngagementFields
+                      key={`${row.postId}-${row.likes}-${row.comments}`}
+                      row={row}
+                      onSaved={() => router.refresh()}
+                    />
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-3">
                     <p

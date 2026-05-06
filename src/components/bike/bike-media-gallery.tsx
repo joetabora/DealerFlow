@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { deleteBikeMedia } from "@/app/bikes/[id]/actions";
+import { deleteBikeMedia } from "@/app/(dashboard)/bikes/[id]/actions";
 import { BrowserImage } from "@/components/media/browser-image";
 import { ExpandableMedia } from "@/components/media/media-lightbox";
 import { useToast } from "@/components/ui/toast";

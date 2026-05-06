@@ -8,7 +8,7 @@ import {
 } from "@/lib/csv/inventoryCsv";
 
 export type CsvImportResult =
-  | { ok: true; imported: number; removed: number }
+  | { ok: true; imported: number; markedSold: number }
   | { ok: false; error: string };
 
 const CHUNK = 150;
@@ -116,17 +116,18 @@ export async function importInventoryFromText(
     return { ok: false, error: msg };
   }
 
-  const toDelete = allDbSkus.filter((s) => !skusInCsv.has(s));
-  for (let i = 0; i < toDelete.length; i += DELETE_CHUNK) {
-    const chunk = toDelete.slice(i, i + DELETE_CHUNK);
-    const { error: delError } = await supabase
+  const skusNotInCsv = allDbSkus.filter((s) => !skusInCsv.has(s));
+  const MARK_CHUNK = DELETE_CHUNK;
+  for (let i = 0; i < skusNotInCsv.length; i += MARK_CHUNK) {
+    const chunk = skusNotInCsv.slice(i, i + MARK_CHUNK);
+    const { error: upErr } = await supabase
       .from("bikes")
-      .delete()
+      .update({ status: "sold" })
       .in("sku", chunk);
-    if (delError) {
-      return { ok: false, error: delError.message };
+    if (upErr) {
+      return { ok: false, error: upErr.message };
     }
   }
 
-  return { ok: true, imported: availableRows.length, removed: toDelete.length };
+  return { ok: true, imported: availableRows.length, markedSold: skusNotInCsv.length };
 }

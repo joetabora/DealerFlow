@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useId, useState, useTransition } from "react";
 import Link from "next/link";
+import { useId, useState, useTransition } from "react";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import type { SchedulerCell } from "@/types/scheduler";
 
 type Props = {
@@ -12,21 +13,41 @@ type Props = {
   timeLabel: string;
   /** Return a promise; parent shows toast and reloads */
   onSave: (caption: string) => void | Promise<void>;
+  /** Optional: parent runs server action; dialog shows spinner */
+  onMarkPosted?: () => void | Promise<void>;
 };
 
 /**
  * View/edit one scheduled post. Drag remains on a separate handle on the card so
  * the main surface can open this dialog.
  */
-export function SchedulerPostDialog({ open, onClose, cell, timeLabel, onSave }: Props) {
+export function SchedulerPostDialog({
+  open,
+  onClose,
+  cell,
+  timeLabel,
+  onSave,
+  onMarkPosted,
+}: Props) {
+  const { show } = useToast();
   const [text, setText] = useState(cell.caption ?? "");
   const [pending, start] = useTransition();
+  const [postedPending, startPosted] = useTransition();
   const idBase = useId();
   const capId = `${idBase}-cap`;
 
-  useEffect(() => {
-    if (open) setText(cell.caption ?? "");
-  }, [open, cell.caption, cell.postId, cell.bikeId]);
+  async function handleCopyForPosting() {
+    const cap = text.trim();
+    const urlPart = cell.thumbUrl ?? "";
+    const pack = urlPart ? `${cap}\n\n${urlPart}` : cap;
+    try {
+      await navigator.clipboard.writeText(pack);
+      show("Caption and hero URL copied to clipboard.", "success");
+    } catch {
+      show("Could not copy — try copying from the caption field manually.", "error");
+    }
+  }
+
 
   if (!open) return null;
 
@@ -70,6 +91,39 @@ export function SchedulerPostDialog({ open, onClose, cell, timeLabel, onSave }: 
           Tip: use the <span className="font-medium">⋮⋮</span> grip to drag; click
           the card to edit here.
         </p>
+        <div className="mt-4 space-y-2 border-t border-gray-100 pt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            Manual posting (Meta, etc.)
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={buttonSecondary + " text-sm"}
+              disabled={pending || postedPending}
+              onClick={() => void handleCopyForPosting()}
+            >
+              Copy caption &amp; hero URL
+            </button>
+            {cell.postId?.trim() && onMarkPosted ? (
+              <button
+                type="button"
+                className={buttonPrimary + " text-sm"}
+                disabled={pending || postedPending}
+                onClick={() => {
+                  startPosted(async () => {
+                    await onMarkPosted();
+                  });
+                }}
+              >
+                {postedPending ? "Updating…" : "Mark as posted"}
+              </button>
+            ) : null}
+          </div>
+          <p className="text-xs text-gray-500">
+            After you publish externally, mark the slot as posted so engagement on the leaderboard
+            lines up with real posts.
+          </p>
+        </div>
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           <Link
             href={`/bikes/${cell.bikeId}`}
@@ -82,14 +136,14 @@ export function SchedulerPostDialog({ open, onClose, cell, timeLabel, onSave }: 
             type="button"
             className={buttonSecondary}
             onClick={onClose}
-            disabled={pending}
+            disabled={pending || postedPending}
           >
             Cancel
           </button>
           <button
             type="button"
             className={buttonPrimary}
-            disabled={pending}
+            disabled={pending || postedPending}
             onClick={() => {
               start(async () => {
                 await onSave(text);

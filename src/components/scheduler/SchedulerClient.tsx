@@ -46,8 +46,9 @@ import {
   getSchedulerPosts,
   getSlotPlan,
   listBikesForSchedule,
+  markPostPosted,
   updatePostCaption,
-} from "@/app/scheduler/actions";
+} from "@/app/(dashboard)/scheduler/actions";
 import { SHELL_MAX, SHELL_PX } from "@/components/app/shell-classnames";
 import { defaultHoursByDay } from "@/lib/post-timing";
 import { getMonday, getSlotDate, dayLabels } from "@/lib/week";
@@ -302,8 +303,9 @@ export default function SchedulerClient() {
   }, [from, to, monday]);
 
   useEffect(() => {
-    setIsBoot(true);
-    const run = async () => {
+    // Show skeleton overlay while the viewed week reloads after navigation.
+    void (async () => {
+      setIsBoot(true);
       setLoadError(null);
       const [r, plan] = await Promise.all([getSchedulerPosts(from, to), getSlotPlan()]);
       if (plan.ok) setHoursByDay(plan.hoursByDay);
@@ -325,8 +327,7 @@ export default function SchedulerClient() {
       }));
       setGrid(mapPostsToGrid(monday, posts));
       setIsBoot(false);
-    };
-    void run();
+    })();
   }, [from, to, monday]);
 
   const sensors = useSensors(
@@ -725,6 +726,7 @@ export default function SchedulerClient() {
       </div>
       {editSlot && editDialogCell ? (
         <SchedulerPostDialog
+          key={`slot-${editSlot.d}-${editSlot.s}-${editDialogCell.postId || "pending"}-${editDialogCell.bikeId}`}
           open
           onClose={() => setEditSlot(null)}
           cell={editDialogCell}
@@ -735,6 +737,18 @@ export default function SchedulerClient() {
             hoursByDay,
           )}
           onSave={handleDialogSave}
+          onMarkPosted={async () => {
+            const id = editDialogCell.postId?.trim();
+            if (!id) return;
+            const r = await markPostPosted(id);
+            if (!r.ok) {
+              show(r.error, "error");
+              return;
+            }
+            show("Marked as posted.", "success");
+            setEditSlot(null);
+            await reload();
+          }}
         />
       ) : null}
     </>

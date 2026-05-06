@@ -435,6 +435,31 @@ export async function updatePostEngagement(
 
 export type UpdateCaptionResult = { ok: true } | { ok: false; error: string };
 
+export async function markPostPosted(postId: string): Promise<ActionResult> {
+  if (!postId?.trim()) {
+    return { ok: false, error: "Nothing to update yet — save the week first." };
+  }
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  const { error } = await supabase
+    .from("posts")
+    .update({
+      status: "posted",
+      posted_at: new Date().toISOString(),
+    })
+    .eq("id", postId)
+    .in("status", ["draft", "scheduled"]);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  revalidatePath("/scheduler");
+  revalidatePath("/leaderboard");
+  return { ok: true };
+}
+
 export async function updatePostCaption(
   postId: string,
   caption: string,

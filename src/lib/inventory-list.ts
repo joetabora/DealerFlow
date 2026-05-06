@@ -1,6 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Bike } from "@/types/bike";
 
+/** What to list on `/inventory`; default is in-stock only. */
+export type InventoryStatusFilter = "available" | "sold" | "all";
+
+export function parseInventoryFilter(
+  raw: string | undefined,
+): InventoryStatusFilter {
+  if (raw === "sold" || raw === "all") return raw;
+  return "available";
+}
+
 export type InventoryBike = Bike & {
   mediaCount: number;
   hasVideo: boolean;
@@ -57,7 +67,39 @@ function buildMediaPreview(
   return { hasVideo: false, heroUrl: null, heroIsVideo: false };
 }
 
-export async function getInventoryBikes(): Promise<
+export async function getBikeStatusCounts(): Promise<
+  | { ok: true; available: number; sold: number }
+  | { ok: false; error: "config" | "query"; message?: string }
+> {
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch {
+    return { ok: false, error: "config" };
+  }
+
+  const [ava, slo] = await Promise.all([
+    supabase.from("bikes").select("*", { count: "exact", head: true }).eq("status", "available"),
+    supabase.from("bikes").select("*", { count: "exact", head: true }).eq("status", "sold"),
+  ]);
+
+  if (ava.error) {
+    return { ok: false, error: "query", message: ava.error.message };
+  }
+  if (slo.error) {
+    return { ok: false, error: "query", message: slo.error.message };
+  }
+
+  return {
+    ok: true,
+    available: ava.count ?? 0,
+    sold: slo.count ?? 0,
+  };
+}
+
+export async function getInventoryBikes(
+  filter: InventoryStatusFilter = "available",
+): Promise<
   | { ok: true; bikes: InventoryBike[] }
   | { ok: false; error: "config" | "query"; message?: string }
 > {
@@ -68,13 +110,20 @@ export async function getInventoryBikes(): Promise<
     return { ok: false, error: "config" };
   }
 
-  const { data, error } = await supabase
+  let q = supabase
     .from("bikes")
     .select(
       "id, sku, title, year, model, mileage, price, location, description, status, last_posted_at, post_count, created_at, media(count)",
     )
-    .eq("status", "available")
     .order("created_at", { ascending: false });
+
+  if (filter === "available") {
+    q = q.eq("status", "available");
+  } else if (filter === "sold") {
+    q = q.eq("status", "sold");
+  }
+
+  const { data, error } = await q;
 
   if (error) {
     return { ok: false, error: "query", message: error.message };

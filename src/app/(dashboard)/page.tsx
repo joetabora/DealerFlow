@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { getTopPerformingPosts } from "@/lib/leaderboard-data";
 import { TopPerformingBikes } from "@/components/leaderboard/top-performing-bikes";
+import { SetupChecklistCard } from "@/components/app/setup-checklist";
 
 function postStatusVariant(
   s: string,
@@ -34,12 +35,7 @@ export default async function Home() {
       <PageHeader title="Dashboard" />
       <AppLayout>
         {data.error === "config" ? (
-          <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-sm leading-relaxed text-amber-900">
-            Connect Supabase: set{" "}
-            <code className="rounded bg-amber-100/80 px-1">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
-            and a public key in{" "}
-            <code className="rounded bg-amber-100/80 px-1">.env.local</code>.
-          </p>
+          <SetupChecklistCard />
         ) : data.error ? (
           <p className="rounded-2xl border border-red-200 bg-red-50 p-3.5 text-sm leading-relaxed text-red-800">
             {data.error}

@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DealerFlow
 
-## Getting Started
+Dealership-focused Next.js app: **CSV inventory**, **bulk media uploads** to Supabase Storage, **weekly scheduler** with captions and drag-and-drop, and a **leaderboard** with manual engagement tracking.
 
-First, run the development server:
+Built with Next.js App Router (`src/app/` + `src/app/(dashboard)/` for authenticated shell routes), Tailwind CSS, `@supabase/ssr`, and optional server-side FFmpeg for video normalization.
+
+---
+
+## Prerequisites
+
+- Node.js 20+ (CI uses Node 22)
+- A Supabase project (PostgreSQL + Storage bucket `bike-media`)
+- FFmpeg available on the server if you rely on `/api/media/process-video` transcoding (`ffmpeg-static` is bundled where possible).
+
+---
+
+## Environment
+
+Copy [.env.local.example](/.env.local.example) to `.env.local`.
+
+| Variable | Purpose |
+|---------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable anon key |
+| Optional time zone | `NEXT_PUBLIC_DEALER_TZ` |
+| Auth / middleware | `NEXT_PUBLIC_REQUIRE_AUTH` (default requires login unless set to `false`) |
+| Local UI escape hatch | `NEXT_PUBLIC_SKIP_LOGIN=1` skips login redirects (**never ship public with permissive RLS**) |
+
+Until URL + key exist, middleware does not redirect; the homepage shows an onboarding checklist (`SetupChecklistCard`).
+
+---
+
+## Database
+
+SQL migrations live in [`supabase/migrations/`](/supabase/migrations/). Apply in chronological order (`supabase db push` from the CLI, or paste into the Supabase SQL editor).
+
+- **Initial permissive MVP RLS**: `20260424120000_init.sql` — permissive anon policies for demos.
+- **Production-style lockdown**: [`20260432400000_authenticated_only_rls.sql`](/supabase/migrations/20260432400000_authenticated_only_rls.sql) — restricts `bikes`, `media`, `posts`, and writes to authenticated sessions; Storage reads stay public on `bike-media`, writes require auth.
+
+Recommended order:
+
+1. Create tables with init + follow-on migrations through your current head.
+2. In Supabase **Authentication**, add a dealer user (**email/password** works with the bundled `/login` page).
+3. Apply `20260432400000_authenticated_only_rls.sql` once you’re ready — **anonymous clients will no longer read/write**.
+
+---
+
+## Sign-in (`/login`)
+
+Uses Supabase Email + Password (`signInWithPassword`). The `/auth/callback` route completes OAuth/PKCE or magic-link flows if you enable them later.
+
+- **Sidebar** (desktop) and **bottom navigation** (mobile) include **Sign out**.
+
+---
+
+## CSV sync behavior
+
+`/import/csv` upserts all **available** rows from your file keyed by SKU. Any SKU already stored that is missing from this file’s in-stock rows is **`status → sold`** (not deleted), so posts and media keep referential integrity. See UX copy next to the uploader.
+
+---
+
+## Scheduler workflows
+
+Edit captions in the post dialog; use **Copy caption & hero URL** for manual Meta posting.
+
+**Mark as posted** sets `posts.status = 'posted'` and `posted_at` so leaderboard engagement matches real publishes.
+
+---
+
+## Scripts
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev       # Dev server
+npm run build     # Production build (set env as in CI below)
+npm run start     # Start production server
+npm run lint      # ESLint
+npm run test      # Vitest (scheduling cooldown, schedule grid invariants, CSV parsing)
+npm run test:watch
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+GitHub Actions (`.github/workflows/ci.yml`): `npm ci`, `lint`, `test`, `build` with placeholder Supabase env and `NEXT_PUBLIC_SKIP_LOGIN=1` so the build succeeds without secrets.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Security notes
 
-## Learn More
+- The **anon** key is still public — production safety depends on **RLS + auth**, not obscurity.
+- `POST /api/media/process-video` requires a logged-in session unless `NEXT_PUBLIC_SKIP_LOGIN=1` (parity with middleware escape hatch).
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Private / internal — adjust as appropriate for your org.

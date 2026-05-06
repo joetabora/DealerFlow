@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { cn } from "@/lib/cn";
+import { createClient } from "@/lib/supabase/client";
 import { SHELL_MAX, SHELL_PX } from "./shell-classnames";
 
 const items = [
@@ -33,11 +35,33 @@ function isActive(pathname: string, href: string) {
 
 export function BottomNav() {
   const pathname = usePathname();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await createClient().auth.signOut();
+      window.location.href = "/login";
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200/90 bg-white/95 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-[0_-2px_16px_rgba(0,0,0,0.04)] backdrop-blur-md md:hidden"
       aria-label="Main navigation"
     >
+      <div className={cn(SHELL_MAX, SHELL_PX, "flex justify-end pt-2")}>
+        <button
+          type="button"
+          disabled={signingOut}
+          onClick={() => void signOut()}
+          className="text-[11px] font-medium text-gray-500 underline decoration-gray-300 underline-offset-2 disabled:opacity-50"
+        >
+          {signingOut ? "…" : "Sign out"}
+        </button>
+      </div>
       <div
         className={cn(
           SHELL_MAX,

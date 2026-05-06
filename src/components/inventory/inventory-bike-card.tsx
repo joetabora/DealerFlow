@@ -6,6 +6,7 @@ import { BrowserImage } from "@/components/media/browser-image";
 import { ExpandableMedia } from "@/components/media/media-lightbox";
 import { Badge } from "@/components/ui/badge";
 import { CardShell } from "@/components/ui/card";
+import { InventoryBikeDeleteFooter } from "@/components/inventory/inventory-bike-delete-footer";
 import { cn } from "@/lib/cn";
 
 type Props = { bike: InventoryBike };
@@ -105,6 +106,11 @@ export function InventoryBikeCard({ bike }: Props) {
           </span>
         </div>
       </Link>
+      <InventoryBikeDeleteFooter
+        bikeId={bike.id}
+        sku={bike.sku}
+        title={bike.title ?? null}
+      />
     </CardShell>
   );
 }
