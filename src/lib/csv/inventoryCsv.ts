@@ -1,4 +1,8 @@
 import { parse } from "csv-parse/sync";
+import type { CsvProfileId } from "@/lib/csv/profiles";
+import { csvProfileAliases } from "@/lib/csv/profiles";
+
+export type { CsvProfileId } from "@/lib/csv/profiles";
 
 export type ParsedInventoryRow = {
   stock: string;
@@ -9,6 +13,8 @@ export type ParsedInventoryRow = {
   location: string | null;
   status: "available" | "sold";
   title: string;
+  modelFamily: string | null;
+  productCategory: string | null;
 };
 
 function getCell(row: Record<string, string | undefined>, ...keys: string[]) {
@@ -32,9 +38,14 @@ function statusFromRow(raw: string | undefined): "available" | "sold" {
 }
 
 /**
- * mBWS / Room 58 style export and similar: Stock Number, Model, Year, Price, Mileage, etc.
+ * Dealer exports (Room 58 / M-BWS and similar): Stock Number, Model, Year, Price, Mileage,
+ * optional Family / Vehicle Type columns when using `mbws` profile aliases.
  */
-export function parseInventoryCsvString(csvText: string): ParsedInventoryRow[] {
+export function parseInventoryCsvString(
+  csvText: string,
+  profile: CsvProfileId = "default",
+): ParsedInventoryRow[] {
+  const H = csvProfileAliases(profile);
   const text = csvText.replace(/^\uFEFF/, "");
   const records = parse(text, {
     columns: true,
@@ -45,32 +56,29 @@ export function parseInventoryCsvString(csvText: string): ParsedInventoryRow[] {
 
   const out: ParsedInventoryRow[] = [];
   for (const row of records) {
-    const stock = getCell(
-      row,
-      "Stock Number",
-      "Stock number",
-      "StockNumber",
-      "stock_number",
-    );
+    const stock = getCell(row, ...H.stock);
     if (!stock) continue;
 
-    const model = getCell(row, "Model", "model");
-    const yRaw = getCell(row, "Year", "year");
+    const model = getCell(row, ...H.model);
+    const yRaw = getCell(row, ...H.year);
     const year = yRaw ? parseInt(yRaw, 10) : null;
     const yearVal = year !== null && !Number.isNaN(year) ? year : null;
 
-    const pr = getCell(row, "Price", "price", "Sale Price", "Sale price");
+    const pr = getCell(row, ...H.price);
     const priceText = pr ? parseMoneyToDisplay(pr) : "—";
 
-    const mileRaw = getCell(row, "Mileage", "mileage");
+    const mileRaw = getCell(row, ...H.mileage);
     let mileage: number | null = null;
     if (mileRaw) {
       const m = parseInt(mileRaw.replace(/,/g, ""), 10);
       if (!Number.isNaN(m)) mileage = m;
     }
 
-    const loc = getCell(row, "Location", "location") || null;
-    const st = getCell(row, "Status", "status");
+    const loc = getCell(row, ...H.location) || null;
+    const st = getCell(row, ...H.status);
+
+    const mf = getCell(row, ...H.modelFamily) || null;
+    const cat = getCell(row, ...H.productCategory) || null;
 
     const titleParts = [yearVal, model].filter(Boolean) as (string | number)[];
     const title =
@@ -79,7 +87,7 @@ export function parseInventoryCsvString(csvText: string): ParsedInventoryRow[] {
             .map((x) => String(x).trim())
             .join(" ")
             .replace(/\s+/g, " ")
-        : (getCell(row, "Title", "title") || stock);
+        : getCell(row, ...H.titleHint) || stock;
 
     out.push({
       stock,
@@ -90,6 +98,8 @@ export function parseInventoryCsvString(csvText: string): ParsedInventoryRow[] {
       location: loc,
       status: statusFromRow(st),
       title: title || stock,
+      modelFamily: mf,
+      productCategory: cat,
     });
   }
   return out;

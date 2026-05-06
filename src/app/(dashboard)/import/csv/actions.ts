@@ -1,40 +1,20 @@
 "use server";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import {
-  MAX_CSV_BIKES,
-  parseInventoryCsvString,
-} from "@/lib/csv/inventoryCsv";
+import type { CsvImportResult } from "@/lib/ingest/inventory-csv-sync";
+import { syncInventoryFromCsvText } from "@/lib/ingest/inventory-csv-sync";
+import { normalizeCsvProfileId, type CsvProfileId } from "@/lib/csv/profiles";
 
-export type CsvImportResult =
-  | { ok: true; imported: number; markedSold: number }
-  | { ok: false; error: string };
-
-const CHUNK = 150;
-const SELECT_PAGE = 1000;
-const DELETE_CHUNK = 200;
-
-async function listAllBikesSkus(supabase: SupabaseClient): Promise<string[]> {
-  const out: string[] = [];
-  for (let from = 0; ; from += SELECT_PAGE) {
-    const { data, error } = await supabase
-      .from("bikes")
-      .select("sku")
-      .order("sku")
-      .range(from, from + SELECT_PAGE - 1);
-    if (error) throw new Error(error.message);
-    if (!data?.length) break;
-    out.push(...(data as { sku: string }[]).map((r) => r.sku));
-    if (data.length < SELECT_PAGE) break;
-  }
-  return out;
-}
+export type { CsvImportResult } from "@/lib/ingest/inventory-csv-sync";
 
 export async function importInventoryCsv(
   formData: FormData,
 ): Promise<CsvImportResult> {
   const file = formData.get("csv");
+  const profileRaw = formData.get("profile");
+  const profile = normalizeCsvProfileId(profileRaw);
+
   if (!file || !(file instanceof File)) {
     return { ok: false, error: "Choose a CSV file." };
   }
@@ -42,92 +22,62 @@ export async function importInventoryCsv(
     return { ok: false, error: "CSV is too large (max 3 MB)." };
   }
   const text = await file.text();
-  return importInventoryFromText(text);
+  return importInventoryFromText(text, { profile });
 }
 
 export async function importInventoryFromText(
   text: string,
+  opts?: { profile?: CsvProfileId },
 ): Promise<CsvImportResult> {
-  let rows: ReturnType<typeof parseInventoryCsvString>;
+  let supabase;
   try {
-    const parsed = parseInventoryCsvString(text);
-    // Last row wins for duplicate stock numbers in the file
-    rows = Array.from(
-      new Map(parsed.map((r) => [r.stock, r] as const)).values(),
-    );
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Failed to parse CSV";
-    return { ok: false, error: msg };
+    supabase = await createClient();
+  } catch {
+    return { ok: false, error: "Supabase is not configured." };
   }
+  const profile = normalizeCsvProfileId(opts?.profile);
 
-  if (rows.length === 0) {
-    return { ok: false, error: "No data rows with a Stock Number were found." };
+  const r = await syncInventoryFromCsvText(supabase, text, {
+    source: "manual",
+    profile,
+  });
+  if (r.ok) {
+    revalidatePath("/inventory");
+    revalidatePath("/import/csv");
   }
-  if (rows.length > MAX_CSV_BIKES) {
-    return {
-      ok: false,
-      error: `Too many rows (${rows.length}). Max is ${MAX_CSV_BIKES}.`,
-    };
-  }
+  return r;
+}
 
-  const availableRows = rows.filter((r) => r.status === "available");
-  if (rows.length > 0 && availableRows.length === 0) {
-    return {
-      ok: false,
-      error:
-        "The file has no available (in-stock) rows — every line is sold. Row(s) with status sold are not imported, and the catalog was not changed. Add at least one available row, or this may be a wrong export.",
-    };
-  }
-  if (availableRows.length > MAX_CSV_BIKES) {
-    return {
-      ok: false,
-      error: `Too many in-stock rows (${availableRows.length}). Max is ${MAX_CSV_BIKES}.`,
-    };
-  }
+export type CsvImportRunRow = {
+  id: string;
+  created_at: string;
+  source: string;
+  profile: string | null;
+  ok: boolean;
+  imported: number | null;
+  marked_sold: number | null;
+  row_count_available: number | null;
+  error_message: string | null;
+};
 
-  const supabase = await createClient();
-  const skusInCsv = new Set(availableRows.map((r) => r.stock));
-
-  for (let i = 0; i < availableRows.length; i += CHUNK) {
-    const batch = availableRows.slice(i, i + CHUNK).map((r) => ({
-      sku: r.stock,
-      title: r.title,
-      year: r.year,
-      model: r.model,
-      mileage: r.mileage,
-      price: r.priceText,
-      location: r.location,
-      status: "available" as const,
-    }));
-
-    const { error } = await supabase.from("bikes").upsert(batch, {
-      onConflict: "sku",
-    });
-    if (error) {
-      return { ok: false, error: error.message };
-    }
-  }
-
-  let allDbSkus: string[];
+export async function listRecentCsvImportRuns(limit = 12): Promise<
+  | { ok: true; rows: CsvImportRunRow[] }
+  | { ok: false; error: string }
+> {
+  let supabase;
   try {
-    allDbSkus = await listAllBikesSkus(supabase);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Failed to list existing bikes";
-    return { ok: false, error: msg };
+    supabase = await createClient();
+  } catch {
+    return { ok: false, error: "Supabase is not configured." };
   }
+  const { data, error } = await supabase
+    .from("csv_import_runs")
+    .select(
+      "id, created_at, source, profile, ok, imported, marked_sold, row_count_available, error_message",
+    )
+    .order("created_at", { ascending: false })
+    .limit(Math.min(40, Math.max(1, limit)));
 
-  const skusNotInCsv = allDbSkus.filter((s) => !skusInCsv.has(s));
-  const MARK_CHUNK = DELETE_CHUNK;
-  for (let i = 0; i < skusNotInCsv.length; i += MARK_CHUNK) {
-    const chunk = skusNotInCsv.slice(i, i + MARK_CHUNK);
-    const { error: upErr } = await supabase
-      .from("bikes")
-      .update({ status: "sold" })
-      .in("sku", chunk);
-    if (upErr) {
-      return { ok: false, error: upErr.message };
-    }
-  }
-
-  return { ok: true, imported: availableRows.length, markedSold: skusNotInCsv.length };
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, rows: (data ?? []) as CsvImportRunRow[] };
 }

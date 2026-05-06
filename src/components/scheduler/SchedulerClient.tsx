@@ -25,6 +25,7 @@ import {
   useTransition,
 } from "react";
 import { mapPostsToGrid } from "@/lib/schedule-mapper";
+import { buildWeeklyPostingPackage } from "@/lib/schedule-export";
 import {
   buildApplyFlat,
   buildGenerateApplyFlat,
@@ -298,6 +299,10 @@ export default function SchedulerClient() {
       location: p.location,
       thumb: p.thumb,
       caption: p.caption,
+      sku: p.sku,
+      year: p.year,
+      model: p.model,
+      mileage: p.mileage,
     }));
     setGrid(mapPostsToGrid(monday, posts));
   }, [from, to, monday]);
@@ -324,6 +329,10 @@ export default function SchedulerClient() {
         location: p.location,
         thumb: p.thumb,
         caption: p.caption,
+        sku: p.sku,
+        year: p.year,
+        model: p.model,
+        mileage: p.mileage,
       }));
       setGrid(mapPostsToGrid(monday, posts));
       setIsBoot(false);
@@ -457,6 +466,25 @@ export default function SchedulerClient() {
     });
   }, [from, to, monday, locFilter, show, reload]);
 
+  const onExportWeek = useCallback(() => {
+    try {
+      const pkg = buildWeeklyPostingPackage(monday, hoursByDay, gridRef.current);
+      const blob = new Blob([JSON.stringify(pkg, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const day = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+      a.download = `dealerflow-posting-week-${day}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      show("Posting package downloaded as JSON.", "success");
+    } catch {
+      show("Could not build export.", "error");
+    }
+  }, [monday, hoursByDay, show]);
+
   const onClear = useCallback(() => {
     startTransition(async () => {
       const r = await clearWeek(from, to);
@@ -541,6 +569,14 @@ export default function SchedulerClient() {
         title="Scheduler"
         action={
           <div className="hidden flex-wrap items-center justify-end gap-2 md:flex">
+            <button
+              type="button"
+              onClick={onExportWeek}
+              className={buttonSecondary}
+              disabled={isPending || !hasAny}
+            >
+              Export week (JSON)
+            </button>
             <button
               type="button"
               onClick={onGenerate}
@@ -726,7 +762,7 @@ export default function SchedulerClient() {
       </div>
       {editSlot && editDialogCell ? (
         <SchedulerPostDialog
-          key={`slot-${editSlot.d}-${editSlot.s}-${editDialogCell.postId || "pending"}-${editDialogCell.bikeId}`}
+          key={`slot-${editSlot.d}-${editSlot.s}-${editDialogCell.postId || "pending"}-${editDialogCell.bikeId}-c${encodeURIComponent((editDialogCell.caption ?? "").slice(0, 128))}`}
           open
           onClose={() => setEditSlot(null)}
           cell={editDialogCell}

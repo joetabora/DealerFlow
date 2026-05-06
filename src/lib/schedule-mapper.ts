@@ -11,6 +11,10 @@ type PostIn = {
   location: string | null;
   thumb: string | null;
   caption: string | null;
+  sku?: string | null;
+  year?: number | null;
+  model?: string | null;
+  mileage?: number | null;
 };
 
 /**
@@ -49,12 +53,16 @@ export function mapPostsToGrid(weekStart: Date, posts: PostIn[]): (SchedulerCell
       grid[d]![s] = {
         postId: p.id,
         bikeId: p.bike_id,
+        sku: p.sku ?? null,
         title: p.title?.trim() ?? "Untitled",
         price: p.price ?? "—",
         location: p.location?.trim() ?? null,
         thumbUrl: p.thumb,
         status: p.status as SchedulerCell["status"],
         caption: p.caption,
+        year: p.year ?? null,
+        model: p.model ?? null,
+        mileage: p.mileage ?? null,
       };
     }
   }

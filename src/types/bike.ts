@@ -5,6 +5,10 @@ export type Bike = {
   price: string | null;
   location: string | null;
   description: string | null;
+  /** Model lineage for scheduler diversification (CSV / manual). */
+  model_family: string | null;
+  /** e.g. sport, cruiser — optional bucket from export. */
+  product_category: string | null;
   year: number | null;
   model: string | null;
   mileage: number | null;

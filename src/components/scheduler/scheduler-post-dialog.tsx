@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, useTransition } from "react";
+import { useId, useMemo, useState, useTransition } from "react";
+import {
+  CAPTION_TEMPLATES,
+  normalizeCaptionTemplateId,
+  validateCaptionAgainstConstraints,
+} from "@/lib/caption";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import type { SchedulerCell } from "@/types/scheduler";
@@ -35,6 +40,19 @@ export function SchedulerPostDialog({
   const [postedPending, startPosted] = useTransition();
   const idBase = useId();
   const capId = `${idBase}-cap`;
+
+  const lintTemplateId = useMemo(
+    () => normalizeCaptionTemplateId(process.env.NEXT_PUBLIC_CAPTION_TEMPLATE),
+    [],
+  );
+  const captionLint = useMemo(() => {
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+    return validateCaptionAgainstConstraints(
+      trimmed,
+      CAPTION_TEMPLATES[lintTemplateId].constraints,
+    );
+  }, [text, lintTemplateId]);
 
   async function handleCopyForPosting() {
     const cap = text.trim();
@@ -87,6 +105,17 @@ export function SchedulerPostDialog({
             placeholder="Write the post copy (title, price, location, call to action…)."
           />
         </div>
+        {captionLint && !captionLint.ok ? (
+          <ul className="mt-2 list-disc space-y-0.5 pl-4 text-xs text-amber-800" role="status">
+            {captionLint.issues.map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ul>
+        ) : null}
+        <p className="mt-1 text-xs tabular-nums text-gray-400">
+          {text.trim().length} characters · lint:{" "}
+          {CAPTION_TEMPLATES[lintTemplateId].label}
+        </p>
         <p className="mt-2 text-xs text-gray-500">
           Tip: use the <span className="font-medium">⋮⋮</span> grip to drag; click
           the card to edit here.

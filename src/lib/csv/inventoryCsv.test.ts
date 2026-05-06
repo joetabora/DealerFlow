@@ -23,4 +23,15 @@ describe("parseInventoryCsvString", () => {
     const rows = parseInventoryCsvString(csv);
     expect(rows.map((r) => r.stock)).toEqual(["U3"]);
   });
+
+  it("reads model family and category columns", () => {
+    const hdr =
+      "Stock Number,Model,Year,Price,Mileage,Model Family,Category\n";
+    const csv =
+      hdr + "S1,Z400,2024,8000,,Kawasaki Ninja line,Sportbike\n";
+    const rows = parseInventoryCsvString(csv, "default");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.modelFamily).toBe("Kawasaki Ninja line");
+    expect(rows[0]!.productCategory).toBe("Sportbike");
+  });
 });

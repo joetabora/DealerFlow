@@ -113,7 +113,7 @@ export async function getInventoryBikes(
   let q = supabase
     .from("bikes")
     .select(
-      "id, sku, title, year, model, mileage, price, location, description, status, last_posted_at, post_count, created_at, media(count)",
+      "id, sku, title, year, model, mileage, price, location, description, model_family, product_category, status, last_posted_at, post_count, created_at, media(count)",
     )
     .order("created_at", { ascending: false });
 

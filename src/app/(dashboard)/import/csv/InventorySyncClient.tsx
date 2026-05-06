@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { importInventoryCsv, type CsvImportResult } from "./actions";
 import { BulkMediaUploader } from "./BulkMediaUploader";
@@ -7,6 +8,7 @@ import { buttonPrimary } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
 export function InventorySyncClient() {
+  const router = useRouter();
   const { show } = useToast();
   const [csvState, setCsvState] = useState<CsvImportResult | null>(null);
   const [mediaKey, setMediaKey] = useState(0);
@@ -26,6 +28,7 @@ export function InventorySyncClient() {
           `Inventory synced: ${r.imported} in stock; ${r.markedSold} not in file → marked sold.`,
           "success",
         );
+        router.refresh();
       } else {
         show(r.error, "error");
       }
@@ -42,7 +45,9 @@ export function InventorySyncClient() {
           Exports with columns like{" "}
           <strong>Stock Number</strong>, <strong>Model</strong>, <strong>Year</strong>,{" "}
           <strong>Price</strong>, <strong>Mileage</strong>, and optional{" "}
-          <strong>Location</strong> / <strong>Status</strong> are supported.{" "}
+          <strong>Location</strong> / <strong>Status</strong> are supported. Optional columns{" "}
+          <strong>Model Family</strong> / <strong>Vehicle Type</strong> drive scheduler diversification when
+          present. Choose an import profile to match header aliases — runs are logged below.{" "}
           <strong>Stock Number</strong> is the internal <code>sku</code>. Each sync{" "}
           <strong>upserts in-stock rows</strong> from the CSV. Units already in DealerFlow whose
           SKUs are absent from this file&apos;s <em>available</em> list are marked{" "}
@@ -58,6 +63,20 @@ export function InventorySyncClient() {
           onSubmit={onCsvSubmit}
           className="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-end"
         >
+          <div>
+            <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">
+              Profile
+            </label>
+            <select
+              name="profile"
+              defaultValue="default"
+              disabled={pending}
+              className="mt-0.5 min-h-10 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+            >
+              <option value="default">Default column map</option>
+              <option value="mbws">M-BWS / Room 58 style</option>
+            </select>
+          </div>
           <div className="min-w-0 flex-1">
             <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">
               CSV file

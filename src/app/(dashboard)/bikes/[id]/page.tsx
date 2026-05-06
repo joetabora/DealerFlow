@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { BikeMediaGallery } from "@/components/bike/bike-media-gallery";
 import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { renderDefaultCaption } from "@/lib/caption-template";
 import type { Bike, BikeMedia } from "@/types/bike";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export default async function BikeDetailPage({ params }: Props) {
   const { data, error } = await supabase
     .from("bikes")
     .select(
-      "id, sku, title, year, model, mileage, price, location, description, status, last_posted_at, post_count, created_at",
+      "id, sku, title, year, model, mileage, price, location, description, status, model_family, product_category, last_posted_at, post_count, created_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -53,6 +54,17 @@ export default async function BikeDetailPage({ params }: Props) {
     .eq("bike_id", id)
     .order("created_at", { ascending: true });
   const media = (mediaRows as BikeMedia[] | null) ?? [];
+
+  const title = bike.title?.trim() || "Bike";
+  const price = bike.price?.trim() ?? "—";
+  const captionPreview = renderDefaultCaption({
+    title,
+    price,
+    location: bike.location,
+    year: bike.year,
+    model: bike.model,
+    mileage: bike.mileage,
+  });
 
   return (
     <>
@@ -102,6 +114,14 @@ export default async function BikeDetailPage({ params }: Props) {
                 </dd>
               </div>
               <div>
+                <dt className={label}>Model family</dt>
+                <dd className={value}>{bike.model_family ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className={label}>Category</dt>
+                <dd className={value}>{bike.product_category ?? "—"}</dd>
+              </div>
+              <div>
                 <dt className={label}>Location</dt>
                 <dd className={value}>{bike.location ?? "—"}</dd>
               </div>
@@ -134,6 +154,19 @@ export default async function BikeDetailPage({ params }: Props) {
                 </dd>
               </div>
             </dl>
+          </Card>
+
+          <Card>
+            <h2 className="text-lg font-medium leading-tight text-gray-800">
+              Caption preview
+            </h2>
+            <p className="mt-1.5 text-xs text-gray-500">
+              Matches the active caption template (<code>NEXT_PUBLIC_CAPTION_TEMPLATE</code>) as it
+              will render for this bike before you edit copy on the scheduler.
+            </p>
+            <pre className="mt-3 whitespace-pre-wrap rounded-xl bg-gray-50 p-4 text-sm leading-relaxed text-gray-800">
+              {captionPreview}
+            </pre>
           </Card>
 
           <BikeMediaGallery bikeId={id} media={media} />

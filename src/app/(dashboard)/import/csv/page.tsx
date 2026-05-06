@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/app/app-layout";
 import { PageHeader } from "@/components/app/page-header";
 import { buttonSecondary } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { RecentImportRuns } from "./recent-import-runs";
 import { InventorySyncClient } from "./InventorySyncClient";
 
 export default function CsvImportPage() {
@@ -39,6 +40,9 @@ export default function CsvImportPage() {
           </p>
           <Card>
             <InventorySyncClient />
+            <div className="mt-6 border-t border-gray-100 pt-6">
+              <RecentImportRuns />
+            </div>
           </Card>
         </div>
       </AppLayout>

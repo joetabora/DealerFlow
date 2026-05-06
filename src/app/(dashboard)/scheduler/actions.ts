@@ -10,6 +10,11 @@ import {
   defaultHoursByDay,
   getDealerTimeZone,
 } from "@/lib/post-timing";
+import {
+  CAPTION_TEMPLATES,
+  normalizeCaptionTemplateId,
+  validateCaptionAgainstConstraints,
+} from "@/lib/caption";
 import { renderDefaultCaption } from "@/lib/caption-template";
 import type { LocationFilter, SchedulerCell } from "@/types/scheduler";
 import type { AnchorPost } from "@/lib/scheduling-cooldown";
@@ -24,6 +29,10 @@ export type PostRowOut = {
   location: string | null;
   thumb: string | null;
   caption: string | null;
+  sku?: string | null;
+  year?: number | null;
+  model?: string | null;
+  mileage?: number | null;
 };
 
 function matchesLocation(
@@ -56,7 +65,9 @@ export async function getSchedulerPosts(
   }
   const { data, error } = await supabase
     .from("posts")
-    .select("id, bike_id, scheduled_date, status, caption, bikes ( title, price, location )")
+    .select(
+      "id, bike_id, scheduled_date, status, caption, bikes ( title, price, location, sku, year, model, mileage )",
+    )
     .gte("scheduled_date", weekFromIso)
     .lt("scheduled_date", weekToIso)
     .in("status", ["draft", "scheduled"]);
@@ -70,8 +81,24 @@ export async function getSchedulerPosts(
     status: string;
     caption: string | null;
     bikes:
-      | { title: string | null; price: string | null; location: string | null }
-      | { title: string | null; price: string | null; location: string | null }[]
+      | {
+          title: string | null;
+          price: string | null;
+          location: string | null;
+          sku: string | null;
+          year: number | null;
+          model: string | null;
+          mileage: number | null;
+        }
+      | {
+          title: string | null;
+          price: string | null;
+          location: string | null;
+          sku: string | null;
+          year: number | null;
+          model: string | null;
+          mileage: number | null;
+        }[]
       | null;
   }[];
 
@@ -101,6 +128,10 @@ export async function getSchedulerPosts(
       title: b?.title ?? null,
       price: b?.price ?? null,
       location: b?.location ?? null,
+      sku: b?.sku ?? null,
+      year: b?.year ?? null,
+      model: b?.model ?? null,
+      mileage: b?.mileage ?? null,
       thumb: thumbByBike.get(p.bike_id) ?? null,
       caption: p.caption,
     };
@@ -314,6 +345,7 @@ type BikeRow = {
   title: string | null;
   price: string | null;
   location: string | null;
+  model_family: string | null;
   post_count: number;
   last_posted_at: string | null;
   media: { count: number }[] | { count: number } | null;
@@ -371,7 +403,9 @@ export async function listBikesForSchedule(
   }
   const { data, error } = await supabase
     .from("bikes")
-    .select("id, title, price, location, post_count, last_posted_at, media(count)")
+    .select(
+      "id, title, price, location, model_family, post_count, last_posted_at, media(count)",
+    )
     .eq("status", "available");
   if (error) return { ok: false, error: error.message };
   const all = (data ?? []) as BikeRow[];
@@ -470,9 +504,20 @@ export async function updatePostCaption(
   } catch {
     return { ok: false, error: "Supabase is not configured." };
   }
+  const trimmed = caption.trim();
+  const templateId = normalizeCaptionTemplateId(
+    process.env.NEXT_PUBLIC_CAPTION_TEMPLATE,
+  );
+  const tpl = CAPTION_TEMPLATES[templateId];
+  if (trimmed) {
+    const v = validateCaptionAgainstConstraints(trimmed, tpl.constraints);
+    if (!v.ok) {
+      return { ok: false, error: v.issues.join(" ") };
+    }
+  }
   const { error } = await supabase
     .from("posts")
-    .update({ caption: caption.trim() || null })
+    .update({ caption: trimmed || null })
     .eq("id", postId);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/scheduler");
@@ -495,7 +540,9 @@ export async function getSchedulerPayloadForBike(
   }
   const { data: b, error } = await supabase
     .from("bikes")
-    .select("id, title, price, location")
+    .select(
+      "id, title, price, location, sku, year, model, mileage, model_family",
+    )
     .eq("id", bikeId)
     .eq("status", "available")
     .maybeSingle();
@@ -508,6 +555,11 @@ export async function getSchedulerPayloadForBike(
     title: string | null;
     price: string | null;
     location: string | null;
+    sku: string | null;
+    year: number | null;
+    model: string | null;
+    mileage: number | null;
+    model_family: string | null;
   };
   const { data: mrows } = await supabase
     .from("media")
@@ -528,15 +580,22 @@ export async function getSchedulerPayloadForBike(
   const cell: SchedulerCell = {
     postId: "",
     bikeId: bike.id,
+    sku: bike.sku ?? null,
     title,
     price,
     location: bike.location?.trim() ?? null,
     thumbUrl: firstImg?.file_url ?? null,
     status: "draft",
+    year: bike.year,
+    model: bike.model,
+    mileage: bike.mileage,
     caption: renderDefaultCaption({
       title,
       price,
       location: bike.location,
+      year: bike.year,
+      model: bike.model,
+      mileage: bike.mileage,
     }),
   };
   return { ok: true, cell };

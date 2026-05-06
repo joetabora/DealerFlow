@@ -11,11 +11,12 @@ export type ApplyCell = {
   caption: string | null;
 } | null;
 
-type BikeForGen = {
+export type BikeForGen = {
   id: string;
   title: string | null;
   price: string | null;
   location: string | null;
+  model_family?: string | null;
 };
 
 function captionFor(b: BikeForGen | SchedulerCell) {
@@ -25,10 +26,16 @@ function captionFor(b: BikeForGen | SchedulerCell) {
       : (b as BikeForGen).title?.trim() ?? "Bike";
   const price = ((b as BikeForGen).price ?? (b as SchedulerCell).price) ?? "—";
   const loc = (b as { location: string | null }).location;
+  const year = "year" in b ? (b as { year?: number | null }).year : undefined;
+  const model = "model" in b ? (b as { model?: string | null }).model : undefined;
+  const mileage = "mileage" in b ? (b as { mileage?: number | null }).mileage : undefined;
   return renderDefaultCaption({
     title: title || "Bike",
     price: String(price),
     location: loc,
+    year,
+    model,
+    mileage,
   });
 }
 
@@ -48,6 +55,32 @@ function blocked(
     if (inCooldown(t, p.t)) return true;
   }
   return false;
+}
+
+/** Same model family twice on one calendar column is discouraged when set on bikes. */
+function modelFamilyKey(raw: string | null | undefined): string | null {
+  const t = raw?.trim();
+  if (!t) return null;
+  return t.toLowerCase();
+}
+
+function familyTakenOnDay(
+  key: string | null,
+  dayIndex: number,
+  byDay: Map<number, Set<string>>,
+): boolean {
+  if (!key) return false;
+  return byDay.get(dayIndex)?.has(key) ?? false;
+}
+
+function recordFamily(key: string | null, dayIndex: number, byDay: Map<number, Set<string>>) {
+  if (!key) return;
+  let s = byDay.get(dayIndex);
+  if (!s) {
+    s = new Set();
+    byDay.set(dayIndex, s);
+  }
+  s.add(key);
 }
 
 export function weekRange(monday: Date): { from: string; to: string } {
@@ -105,7 +138,8 @@ type LocF = "all" | "milwaukee" | "west-bend";
 
 /**
  * Fills up to 28 slots: at most one post per bike per week (14-day spacing vs anchors),
- * with Milwaukee / West Bend interleave when `loc` is "all".
+ * Milwaukee / West Bend interleave when `loc` is "all",
+ * and at most one post per trimmed `model_family` per calendar day when that field is present.
  */
 export function buildGenerateApplyFlat(
   weekStart: Date,
@@ -115,35 +149,48 @@ export function buildGenerateApplyFlat(
   loc: LocF = "all",
 ): ApplyCell[] {
   const ordered = interleaveByDealerLocation(
-    loc === "all" ? bikes : bikes.filter((b) => {
-      const l = (b.location ?? "").toLowerCase();
-      if (loc === "milwaukee") return l.includes("milwaukee");
-      return l.includes("west") && l.includes("bend");
-    }),
+    loc === "all"
+      ? bikes
+      : bikes.filter((b) => {
+          const l = (b.location ?? "").toLowerCase();
+          if (loc === "milwaukee") return l.includes("milwaukee");
+          return l.includes("west") && l.includes("bend");
+        }),
     loc,
   );
   const flat: ApplyCell[] = new Array(28).fill(null) as unknown as ApplyCell[];
   if (ordered.length === 0) return flat;
   const used = new Set<string>();
   const localPlaced: { bikeId: string; t: number }[] = [];
+  const familiesOnDay = new Map<number, Set<string>>();
+
   for (let d = 0; d < 7; d++) {
     const dayHours = hoursByDay[d] ?? hoursByDay[0] ?? defaultHoursByDay()[0]!;
     for (let s = 0; s < 4; s++) {
       const start = d * 4 + s;
       const slotT = getSlotDate(weekStart, d, s, dayHours).getTime();
+
       for (let k = 0; k < ordered.length; k++) {
         const idx = (start * 3 + k) % ordered.length;
         const bike = ordered[idx]!;
         if (used.has(bike.id)) continue;
+
+        const fam = modelFamilyKey(bike.model_family);
+        if (familyTakenOnDay(fam, d, familiesOnDay)) continue;
+
         if (blocked(bike.id, slotT, anchorPosts, localPlaced)) continue;
+
         localPlaced.push({ bikeId: bike.id, t: slotT });
         used.add(bike.id);
+        recordFamily(fam, d, familiesOnDay);
+
         flat[start] = {
           bikeId: bike.id,
           status: "scheduled",
           scheduledAt: new Date(slotT).toISOString(),
           caption: captionFor(bike),
         };
+
         break;
       }
     }
